@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-textPrimary antialiased selection:bg-curvePink selection:text-white bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-[#fcf9fc] to-[#f4f2f5] min-h-screen;
+    font-family: 'Inter', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+@layer utilities {
+  .glassmorphism {
+    @apply bg-white/70 backdrop-blur-xl border border-white shadow-glass;
+  }
+  
+  .glass-dark {
+    @apply bg-curveDark/90 backdrop-blur-xl border border-white/10 shadow-glass text-white;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-curve-gradient;
+  }
+}
