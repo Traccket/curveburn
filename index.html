@@ -1,20 +1,129 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-CO">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- Favicon / App Icons -->
     <link rel="icon" type="image/png" href="/logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- SEO Best Practices -->
-    <title>CURVE - Quemador de Grasa de Alto Rendimiento | El más vendido en Colombia</title>
-    <meta name="description" content="CURVE funciona forzando a tu cuerpo a utilizar tejido adiposo como energía. Termogénesis inteligente y control de ansiedad. Pago contra entrega." />
-    
-    <!-- Modern Typography -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <meta name="theme-color" content="#D17AAB" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- Primary Meta Tags -->
+    <title>CURVE · Quemador de Grasa Premium para Mujeres | Envío Nacional Colombia</title>
+    <meta name="title" content="CURVE · Quemador de Grasa Premium para Mujeres | Envío Nacional Colombia" />
+    <meta name="description" content="Reescribe tu metabolismo con CURVE. Termogénesis inteligente, control de ansiedad y energía limpia. Envío a todo Colombia con pago contra entrega. 100% sin efecto rebote." />
+    <meta name="keywords" content="quemador de grasa, CURVE, termogénico, bajar de peso Colombia, suplemento metabolismo, control ansiedad" />
+    <meta name="author" content="CURVE High-Performance Nutrition" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="googlebot" content="index, follow" />
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://curve.com.co/" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://curve.com.co/" />
+    <meta property="og:title" content="CURVE · Quemador de Grasa Premium para Mujeres" />
+    <meta property="og:description" content="Termogénesis inteligente + control de ansiedad. Resultados reales en miles de mujeres en Colombia. Envío gratis con suscripción." />
+    <meta property="og:image" content="https://curve.com.co/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CURVE - Fórmula termogénica premium" />
+    <meta property="og:locale" content="es_CO" />
+    <meta property="og:site_name" content="CURVE" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://curve.com.co/" />
+    <meta name="twitter:title" content="CURVE · Quemador de Grasa Premium para Mujeres" />
+    <meta name="twitter:description" content="Termogénesis inteligente + control de ansiedad. Resultados reales. Envío gratis con suscripción." />
+    <meta name="twitter:image" content="https://curve.com.co/og-image.png" />
+
+    <!-- Performance: Preconnect & Preload -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://toplinenatural.myshopify.com" />
+    <link rel="dns-prefetch" href="https://toplinenatural.myshopify.com" />
+    <link rel="preload" as="image" href="/producto.png" fetchpriority="high" />
+
+    <!-- Fonts (Inter for body + Outfit for display) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+
+    <!-- Schema.org Product JSON-LD (SEO rich results) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org/",
+      "@type": "Product",
+      "name": "CURVE Quemador de Grasa Premium",
+      "image": "https://curve.com.co/producto.png",
+      "description": "Fórmula termogénica premium para mujeres. Convierte tejido adiposo en energía, controla la ansiedad por comer y eleva la quema basal sin efecto rebote.",
+      "brand": {
+        "@type": "Brand",
+        "name": "CURVE"
+      },
+      "sku": "CURVE-60",
+      "offers": {
+        "@type": "AggregateOffer",
+        "priceCurrency": "COP",
+        "lowPrice": "89000",
+        "highPrice": "110000",
+        "offerCount": "2",
+        "availability": "https://schema.org/InStock",
+        "url": "https://curve.com.co/#comprar"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "2047",
+        "bestRating": "5",
+        "worstRating": "1"
+      }
+    }
+    </script>
+
+    <!-- Schema.org Organization JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "CURVE High-Performance Nutrition",
+      "url": "https://curve.com.co/",
+      "logo": "https://curve.com.co/logo.png",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer service",
+        "availableLanguage": ["Spanish"],
+        "areaServed": "CO"
+      }
+    }
+    </script>
+
+    <!--
+      ============================================
+      🏷️  TRACKING — REEMPLAZA LOS PLACEHOLDERS
+      ============================================
+      1. META PIXEL: reemplaza TU_PIXEL_ID con tu ID de 16 dígitos
+      2. GA4: reemplaza G-TU_GA4_ID con tu ID (formato G-XXXXXXX)
+      3. Los pixeles se cargan SOLO cuando el usuario acepta cookies
+         (ver CookieBanner.jsx). Esto cumple con la Ley 1581 de Colombia.
+      ============================================
+    -->
+
+    <!-- Meta Pixel (carga diferida - ver CookieBanner) -->
+    <script>
+      window.__META_PIXEL_ID__ = 'TU_PIXEL_ID';
+      window.__GA4_ID__ = 'G-TU_GA4_ID';
+    </script>
   </head>
   <body>
+    <noscript>
+      <div style="padding:20px;text-align:center;font-family:sans-serif;background:#FAF8FC;color:#111827">
+        Para usar CURVE necesitas habilitar JavaScript en tu navegador.
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
