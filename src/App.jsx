@@ -1,63 +1,66 @@
 import { useState } from 'react';
+import Header from './components/Header';
 import HeroSection from './components/HeroSection';
-import StickyAddToCart from './components/StickyAddToCart';
+import TrustBar from './components/TrustBar';
+import MarqueeBanner from './components/MarqueeBanner';
 import BentoGrid from './components/BentoGrid';
 import CurveProtocolSection from './components/CurveProtocolSection';
 import UGCProof from './components/UGCProof';
-import CurvePath from './components/CurvePath';
-import Header from './components/Header';
-import ExitIntentModal from './components/ExitIntentModal';
-import LogosSection from './components/LogosSection';
-import MarqueeBanner from './components/MarqueeBanner';
-import FAQSection from './components/FAQSection';
-import QuizModal from './components/QuizModal';
 import BlogSection from './components/BlogSection';
+import FAQSection from './components/FAQSection';
+import Footer from './components/Footer';
+import CurvePath from './components/CurvePath';
+import ExitIntentModal from './components/ExitIntentModal';
+import QuizModal from './components/QuizModal';
+import StickyAddToCart from './components/StickyAddToCart';
+import CookieBanner from './components/CookieBanner';
 
 function App() {
   const [isQuizOpen, setIsQuizOpen] = useState(false);
+
   return (
-    <main className="relative min-h-screen font-sans bg-background selection:bg-curvePink selection:text-white overflow-hidden">
-      
-      {/* Global Modals & Navigation */}
+    <main
+      id="top"
+      className="relative min-h-screen font-sans bg-background selection:bg-curvePink selection:text-white overflow-hidden pb-24 md:pb-0"
+    >
+      {/* Global: nav + modals + banners */}
       <Header onOpenQuiz={() => setIsQuizOpen(true)} />
       <ExitIntentModal />
       <QuizModal isOpen={isQuizOpen} onClose={() => setIsQuizOpen(false)} />
+      <CookieBanner />
 
-      {/* Background Graphic elements */}
+      {/* Fondo decorativo */}
       <CurvePath />
 
-      {/* Hero Section with Pricing */}
+      {/* Hero + pricing (con social proof arriba del H1) */}
       <HeroSection />
 
-      {/* Trust & Prensa */}
-      <LogosSection />
+      {/* Trust bar reemplaza la sección de prensa falsa (Forbes/Oprah/Vogue) */}
+      <TrustBar />
 
-      {/* Tira Movible */}
-      <MarqueeBanner />
-
-      {/* Bento Grid: Science behind CURVE */}
-      <BentoGrid />
-
-      {/* Curve Method: Protocols */}
-      <CurveProtocolSection />
-
-      {/* Blog & Science */}
-      <BlogSection />
-
-      {/* FAQ Accordion Section */}
-      <FAQSection />
-
-      {/* UGC / Social Proof Testimonials */}
+      {/* Testimonios cerca del hero — prueba social visible en el scroll inicial */}
       <UGCProof />
 
-      {/* Marketing Footer */}
-      <footer className="text-center py-10 text-gray-500 font-medium text-sm border-t border-gray-200 relative z-10 glassmorphism">
-        <p>© {new Date().getFullYear()} CURVE High-Performance Nutrition. Todos los derechos reservados.</p>
-      </footer>
+      {/* Tira movible */}
+      <MarqueeBanner />
 
-      {/* Mobile Sticky CTA */}
+      {/* Bento Grid: ciencia detrás de CURVE */}
+      <BentoGrid />
+
+      {/* Curve Method: protocolos */}
+      <CurveProtocolSection />
+
+      {/* Blog & ciencia */}
+      <BlogSection />
+
+      {/* FAQ */}
+      <FAQSection />
+
+      {/* Footer legal + contacto */}
+      <Footer />
+
+      {/* Sticky CTA solo mobile */}
       <StickyAddToCart />
-
     </main>
   );
 }

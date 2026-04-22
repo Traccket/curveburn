@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
-import { 
-  X, Sparkles, ChevronRight, Flame, Battery, Apple, Scale, 
+import { trackLead, trackCTA } from '../lib/analytics';
+import {
+  X, Sparkles, ChevronRight, Flame, Battery, Apple, Scale,
   Activity, PersonStanding, Bed, Zap, Cookie, AlertCircle, TrendingDown,
   Coffee, Moon, Cloud, HeartPulse, Timer, Sun, Clock
 } from 'lucide-react';
+
+// Código de descuento que debes crear en Shopify Admin → Discounts → Create
+// Valor recomendado: 5% OFF, válido para PLAN_2_MONTHS. Sin código → no aplica descuento.
+const QUIZ_DISCOUNT_CODE = 'QUIZ5OFF';
 
 function getDiagnosticResult(answers) {
   const { goal, obstacle, age, digestion } = answers;
@@ -57,20 +62,36 @@ export default function QuizModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  // Prevent scroll when modal is open
+  // Prevent scroll when modal is open — capturamos el valor previo y lo
+  // restauramos al cerrar para no clobberar estilos de otros componentes
+  // (ej. otro modal que también haya aplicado 'hidden').
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
-    return () => { document.body.style.overflow = 'auto'; };
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [isOpen]);
+
+  // Timer de transición entre preguntas. Se cancela en unmount / nuevo click
+  // para evitar setState sobre componentes desmontados.
+  const advanceTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSelectAnswer = (field, value) => {
     setAnswers(prev => ({ ...prev, [field]: value }));
-    // Wait briefly for the animation to feel natural
-    setTimeout(() => {
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = null;
       if (step < 6) {
         setStep(step + 1);
       } else {
@@ -81,19 +102,24 @@ export default function QuizModal({ isOpen, onClose }) {
 
   const startAnalyzing = () => {
     setStep(7);
+    // Quiz completado → registrar como Lead (alto valor para audiencias de Meta)
+    trackLead({ source: 'quiz_completed', value: 0 });
     setTimeout(() => {
       setStep(8);
     }, 3000); // 3 seconds analysis animation
   };
 
   const proceedToCheckout = () => {
-    // Single variant logic for now (same as Hero Section), but applies 5% conceptually 
-    // In a real Shopify environment, this should pass a discount code or select a discounted variant.
-    // For now we map to the standard cart but tell the user the discount is applied.
-    // We use the configured single checkout logic. Wait for further config to add discount logic.
-    const variantId = SHOPIFY_CONFIG.VARIANTS.ONE_TIME.id; 
-    // Fallback if Shopify lib doesn't support the raw discount, it just clicks through.
-    handleCheckout(variantId, 1);
+    // Usamos la variante de SUSCRIPCIÓN (más popular + mejor AOV)
+    // y pasamos el código de descuento REAL al permalink de Shopify
+    trackCTA('quiz_checkout');
+    const variantId = SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS.id;
+    handleCheckout(variantId, 1, {
+      discount: QUIZ_DISCOUNT_CODE,
+      utmSource: 'quiz',
+      utmMedium: 'onsite',
+      utmCampaign: 'diagnostic',
+    });
   };
 
   const diagnosticResult = getDiagnosticResult(answers);

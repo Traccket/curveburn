@@ -1,0 +1,9 @@
+# robots.txt for curve.com.co
+User-agent: *
+Allow: /
+Disallow: /privacidad.html
+Disallow: /terminos.html
+Disallow: /devoluciones.html
+
+# Sitemap
+Sitemap: https://curve.com.co/sitemap.xml
