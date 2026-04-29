@@ -14,7 +14,10 @@ export const SHOPIFY_CONFIG = {
       id: '48063271076081',
       price: 89000,
       label: 'Plan 2 meses',
-      permalink: 'https://toplinenatural.myshopify.com/cart/48063271076081:1',
+      // Selling plan ID del Shopify Subscription Plan "Plan 2 meses CURVE".
+      // Sin este ID, Shopify trata la variante como compra única en vez de suscripción.
+      sellingPlanId: '5465538801',
+      permalink: 'https://toplinenatural.myshopify.com/cart/48063271076081:1?selling_plan=5465538801',
     },
   },
 };
@@ -46,6 +49,17 @@ export function buildCheckoutUrl(variantId, quantity = 1, options = {}) {
   if (options.utmSource) params.append('utm_source', options.utmSource);
   if (options.utmMedium) params.append('utm_medium', options.utmMedium);
   if (options.utmCampaign) params.append('utm_campaign', options.utmCampaign);
+
+  // Selling plan (suscripción): si la variante tiene sellingPlanId configurado,
+  // se añade automáticamente para que Shopify la trate como suscripción recurrente
+  // en vez de compra única. Pasar `options.sellingPlanId = null` lo desactiva.
+  let sellingPlanId = options.sellingPlanId;
+  if (sellingPlanId === undefined) {
+    sellingPlanId = findVariantById(variantIdStr)?.sellingPlanId;
+  }
+  if (sellingPlanId) {
+    params.append('selling_plan', String(sellingPlanId));
+  }
 
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;
