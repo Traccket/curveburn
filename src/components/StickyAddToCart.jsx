@@ -5,7 +5,11 @@ import { trackAddToCart } from '../lib/analytics';
 export default function StickyAddToCart() {
   const [isVisible, setIsVisible] = useState(false);
 
-  const variant = SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS;
+  // Si las suscripciones están desactivadas, fallback a compra única para que
+  // el sticky CTA siempre lleve a un checkout que el cliente pueda completar.
+  const variant = SHOPIFY_CONFIG.SUBSCRIPTIONS_ENABLED
+    ? SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS
+    : SHOPIFY_CONFIG.VARIANTS.ONE_TIME;
 
   useEffect(() => {
     let raf = 0;

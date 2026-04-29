@@ -110,10 +110,13 @@ export default function QuizModal({ isOpen, onClose }) {
   };
 
   const proceedToCheckout = () => {
-    // Usamos la variante de SUSCRIPCIÓN (más popular + mejor AOV)
-    // y pasamos el código de descuento REAL al permalink de Shopify
+    // Usamos la variante de SUSCRIPCIÓN (más popular + mejor AOV) cuando esté
+    // habilitada. Si SUBSCRIPTIONS_ENABLED es false (Wompi pendiente), fallback
+    // a compra única para no enviar al cliente a un checkout sin métodos de pago.
     trackCTA('quiz_checkout');
-    const variantId = SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS.id;
+    const variantId = SHOPIFY_CONFIG.SUBSCRIPTIONS_ENABLED
+      ? SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS.id
+      : SHOPIFY_CONFIG.VARIANTS.ONE_TIME.id;
     handleCheckout(variantId, 1, {
       discount: QUIZ_DISCOUNT_CODE,
       utmSource: 'quiz',

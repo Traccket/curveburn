@@ -3,6 +3,12 @@
 // ============================================================
 export const SHOPIFY_CONFIG = {
   DOMAIN: 'toplinenatural.myshopify.com',
+  // Feature flag: cambiar a true cuando haya un procesador con soporte de
+  // cobros recurrentes activo en Shopify Admin → Payments (ej. Wompi).
+  // Mercado Pago Checkout Pro NO soporta suscripciones; con el flag en false
+  // ocultamos la opción "Plan 2 meses" del hero para evitar que los clientes
+  // lleguen a un checkout sin métodos de pago disponibles.
+  SUBSCRIPTIONS_ENABLED: false,
   VARIANTS: {
     ONE_TIME: {
       id: '48063268585713',
