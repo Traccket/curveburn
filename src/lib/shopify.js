@@ -3,6 +3,12 @@
 // ============================================================
 export const SHOPIFY_CONFIG = {
   DOMAIN: 'toplinenatural.myshopify.com',
+  // Feature flag: cambiar a true cuando haya un procesador con soporte de
+  // cobros recurrentes activo en Shopify Admin → Payments (ej. Wompi).
+  // Mercado Pago Checkout Pro NO soporta suscripciones; con el flag en false
+  // ocultamos la opción "Plan 2 meses" del hero para evitar que los clientes
+  // lleguen a un checkout sin métodos de pago disponibles.
+  SUBSCRIPTIONS_ENABLED: false,
   VARIANTS: {
     ONE_TIME: {
       id: '48063268585713',
@@ -42,24 +48,35 @@ export function buildCheckoutUrl(variantId, quantity = 1, options = {}) {
     throw new Error(`[shopify] variantId debe ser numérico, recibido: ${variantIdStr}`);
   }
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
-  const base = `https://${SHOPIFY_CONFIG.DOMAIN}/cart/${variantIdStr}:${qty}`;
 
-  const params = new URLSearchParams();
-  if (options.discount) params.append('discount', options.discount);
-  if (options.utmSource) params.append('utm_source', options.utmSource);
-  if (options.utmMedium) params.append('utm_medium', options.utmMedium);
-  if (options.utmCampaign) params.append('utm_campaign', options.utmCampaign);
-
-  // Selling plan (suscripción): si la variante tiene sellingPlanId configurado,
-  // se añade automáticamente para que Shopify la trate como suscripción recurrente
-  // en vez de compra única. Pasar `options.sellingPlanId = null` lo desactiva.
+  // Detectar si esta variante tiene asociado un Subscription Plan en Shopify.
+  // Si lo tiene, hay que usar /cart/add con selling_plan (Shopify cart permalinks
+  // del formato /cart/{id}:{qty} no respetan ?selling_plan, lo ignoran).
   let sellingPlanId = options.sellingPlanId;
   if (sellingPlanId === undefined) {
     sellingPlanId = findVariantById(variantIdStr)?.sellingPlanId;
   }
+
+  const params = new URLSearchParams();
+  let base;
+
   if (sellingPlanId) {
+    // Suscripción recurrente: /cart/add lo agrega con selling_plan correctamente
+    // y return_to=/checkout salta el paso intermedio de /cart.
+    base = `https://${SHOPIFY_CONFIG.DOMAIN}/cart/add`;
+    params.append('id', variantIdStr);
+    params.append('quantity', String(qty));
     params.append('selling_plan', String(sellingPlanId));
+    params.append('return_to', '/checkout');
+  } else {
+    // Compra única: cart permalink estándar (más rápido, cero round-trip extra).
+    base = `https://${SHOPIFY_CONFIG.DOMAIN}/cart/${variantIdStr}:${qty}`;
   }
+
+  if (options.discount) params.append('discount', options.discount);
+  if (options.utmSource) params.append('utm_source', options.utmSource);
+  if (options.utmMedium) params.append('utm_medium', options.utmMedium);
+  if (options.utmCampaign) params.append('utm_campaign', options.utmCampaign);
 
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;

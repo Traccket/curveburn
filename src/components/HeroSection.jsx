@@ -7,11 +7,13 @@ import StarRating from './StarRating';
 import GuaranteeBadge from './GuaranteeBadge';
 
 export default function HeroSection() {
+  const SUBS_ENABLED = SHOPIFY_CONFIG.SUBSCRIPTIONS_ENABLED;
   const [isUpsellOpen, setIsUpsellOpen] = useState(false);
-  const [isSubscription, setIsSubscription] = useState(true);
+  // Si las suscripciones están desactivadas (Wompi pendiente), forzamos compra única.
+  const [isSubscription, setIsSubscription] = useState(SUBS_ENABLED);
 
   const formatPrice = (amount) => amount.toLocaleString('es-CO').replace(/,/g, '.');
-  const selectedVariant = isSubscription
+  const selectedVariant = isSubscription && SUBS_ENABLED
     ? SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS
     : SHOPIFY_CONFIG.VARIANTS.ONE_TIME;
 
@@ -70,7 +72,9 @@ export default function HeroSection() {
 
     // Si el usuario eligió Compra Única: mostramos upsell primero.
     // Si ya eligió Suscripción: va directo a checkout.
-    if (!isSubscription) {
+    // Si las suscripciones están desactivadas: saltamos upsell y vamos directo
+    // a checkout (no tiene sentido upsellear a un plan inexistente).
+    if (!isSubscription && SUBS_ENABLED) {
       setIsUpsellOpen(true);
     } else {
       handleCheckout(selectedVariant.id, 1);
@@ -166,61 +170,65 @@ export default function HeroSection() {
                 <p className="text-xs text-gray-400 pl-8">Sin beneficios de suscripción</p>
               </button>
 
-              {/* Radio 2: Suscripción */}
-              <button
-                type="button"
-                role="radio"
-                aria-checked={isSubscription}
-                tabIndex={isSubscription ? 0 : -1}
-                onClick={() => handleSelect(true)}
-                onKeyDown={(e) => handleRadioKey(e, true)}
-                className={`w-full text-left cursor-pointer rounded-2xl border-2 transition-all p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction focus-visible:ring-offset-2 relative ${
-                  isSubscription
-                    ? 'border-curveAction bg-[#fff4f8]'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
-              >
-                <span className="absolute -top-2.5 right-4 bg-curveAction text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
-                  Más popular
-                </span>
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center gap-3">
-                    <span
-                      aria-hidden="true"
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        isSubscription ? 'border-curveAction' : 'border-gray-300'
-                      }`}
-                    >
-                      {isSubscription && (
-                        <span className="w-2.5 h-2.5 bg-curveAction rounded-full"></span>
-                      )}
-                    </span>
-                    <span className="font-bold text-gray-800">Suscripción · Plan 2 meses</span>
+              {/* Radio 2: Suscripción — solo visible si SUBS_ENABLED.
+                  Cuando está desactivado (Wompi pendiente) no renderizamos el botón
+                  para evitar que los clientes lleguen a un checkout sin métodos de pago. */}
+              {SUBS_ENABLED && (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={isSubscription}
+                  tabIndex={isSubscription ? 0 : -1}
+                  onClick={() => handleSelect(true)}
+                  onKeyDown={(e) => handleRadioKey(e, true)}
+                  className={`w-full text-left cursor-pointer rounded-2xl border-2 transition-all p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction focus-visible:ring-offset-2 relative ${
+                    isSubscription
+                      ? 'border-curveAction bg-[#fff4f8]'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <span className="absolute -top-2.5 right-4 bg-curveAction text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
+                    Más popular
+                  </span>
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          isSubscription ? 'border-curveAction' : 'border-gray-300'
+                        }`}
+                      >
+                        {isSubscription && (
+                          <span className="w-2.5 h-2.5 bg-curveAction rounded-full"></span>
+                        )}
+                      </span>
+                      <span className="font-bold text-gray-800">Suscripción · Plan 2 meses</span>
+                    </div>
+                    <span className="font-black text-lg text-curveAction">${priceSub}</span>
                   </div>
-                  <span className="font-black text-lg text-curveAction">${priceSub}</span>
-                </div>
 
-                <div className="pl-8 space-y-2 opacity-90">
-                  <p className="text-xs text-gray-600 flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
-                    Envío gratis incluido
-                  </p>
-                  <p className="text-xs text-gray-600 flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
-                    Ciclo completo de 2 meses asegurado
-                  </p>
-                  <p className="text-xs text-gray-600 flex items-start gap-2">
-                    <CheckCircle2
-                      className="w-3.5 h-3.5 text-curveAction mt-0.5 shrink-0"
-                      aria-hidden="true"
-                    />
-                    <span>
-                      <strong>Entrega automática:</strong> cobramos tu 2ª unidad 5 días antes para
-                      que nunca rompas tu rutina.
-                    </span>
-                  </p>
-                </div>
-              </button>
+                  <div className="pl-8 space-y-2 opacity-90">
+                    <p className="text-xs text-gray-600 flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
+                      Envío gratis incluido
+                    </p>
+                    <p className="text-xs text-gray-600 flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
+                      Ciclo completo de 2 meses asegurado
+                    </p>
+                    <p className="text-xs text-gray-600 flex items-start gap-2">
+                      <CheckCircle2
+                        className="w-3.5 h-3.5 text-curveAction mt-0.5 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>
+                        <strong>Entrega automática:</strong> cobramos tu 2ª unidad 5 días antes para
+                        que nunca rompas tu rutina.
+                      </span>
+                    </p>
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* CTA principal */}
@@ -251,8 +259,11 @@ export default function HeroSection() {
         </div>
       </section>
 
-      {/* Upsell cuando eligen Compra Única */}
-      <UpsellModal isOpen={isUpsellOpen} onClose={() => setIsUpsellOpen(false)} />
+      {/* Upsell cuando eligen Compra Única — solo si SUBS_ENABLED (de lo contrario
+          no tiene sentido mostrar un upsell hacia un plan que no se puede pagar) */}
+      {SUBS_ENABLED && (
+        <UpsellModal isOpen={isUpsellOpen} onClose={() => setIsUpsellOpen(false)} />
+      )}
     </>
   );
 }
