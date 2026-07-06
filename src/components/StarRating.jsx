@@ -12,7 +12,8 @@ export default function StarRating({
   className = '',
 }) {
   const stars = 5;
-  const filled = Math.round(rating);
+  // floor y no round: con 4.8 mostrar 5 estrellas llenas exageraría el rating
+  const filled = Math.floor(rating);
   const sizeClasses = {
     sm: 'w-3.5 h-3.5',
     md: 'w-4 h-4',

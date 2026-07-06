@@ -57,6 +57,7 @@ export default function StickyAddToCart() {
         <button
           type="button"
           onClick={onCheckout}
+          tabIndex={isVisible ? 0 : -1}
           className="shrink-0 bg-white text-curveAction font-black text-xs py-2.5 px-4 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-curveAction"
           aria-label="Añadir al carrito desde barra móvil"
         >

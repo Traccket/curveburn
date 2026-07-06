@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { trackLead, trackCTA } from '../lib/analytics';
+import { useModal } from '../hooks/useModal';
 
 const DISMISS_KEY = 'curve_exit_dismissed';
 const DISMISS_TTL_MS = 1000 * 60 * 60 * 24; // 24h
@@ -8,7 +9,6 @@ const DISMISS_TTL_MS = 1000 * 60 * 60 * 24; // 24h
 export default function ExitIntentModal() {
   const [isOpen, setIsOpen] = useState(false);
   const shownRef = useRef(false);
-  const closeBtnRef = useRef(null);
 
   // Helper: no mostrar si el usuario ya lo cerró en las últimas 24h
   const wasDismissedRecently = () => {
@@ -38,20 +38,25 @@ export default function ExitIntentModal() {
   };
 
   useEffect(() => {
+    // Lista única de cleanups: evita los dos return paths divergentes
+    // (desktop vs mobile) donde era fácil olvidar un listener.
+    const cleanups = [];
+
     // --- DESKTOP: mouseleave por la parte superior ---
     const handleMouseLeave = (e) => {
       if (e.clientY <= 0) show('desktop_mouse');
     };
     document.addEventListener('mouseleave', handleMouseLeave);
+    cleanups.push(() => document.removeEventListener('mouseleave', handleMouseLeave));
 
     // --- MOBILE: timeout + scroll rápido hacia arriba ---
     const isMobile =
       typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
 
-    let timeoutId;
     if (isMobile) {
       // Timer: 45 segundos en la página
-      timeoutId = window.setTimeout(() => show('mobile_timer'), 45000);
+      const timeoutId = window.setTimeout(() => show('mobile_timer'), 45000);
+      cleanups.push(() => clearTimeout(timeoutId));
 
       // Scroll hacia arriba rápido (señal de intención de salir)
       let lastY = window.scrollY;
@@ -68,42 +73,20 @@ export default function ExitIntentModal() {
         lastT = t;
       };
       window.addEventListener('scroll', onScroll, { passive: true });
-
-      return () => {
-        document.removeEventListener('mouseleave', handleMouseLeave);
-        window.removeEventListener('scroll', onScroll);
-        if (timeoutId) clearTimeout(timeoutId);
-      };
+      cleanups.push(() => window.removeEventListener('scroll', onScroll));
     }
 
-    return () => {
-      document.removeEventListener('mouseleave', handleMouseLeave);
-    };
+    return () => cleanups.forEach((fn) => fn());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Bloquear scroll + ESC cuando abierto + focus trap mínimo
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => closeBtnRef.current?.focus(), 50);
-
-    const onKey = (e) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('keydown', onKey);
-
-    return () => {
-      document.body.style.overflow = prev;
-      document.removeEventListener('keydown', onKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
-  const close = () => {
+  const close = useCallback(() => {
     markDismissed();
     setIsOpen(false);
-  };
+  }, []);
+
+  // Scroll lock + Escape + focus trap compartidos entre todos los modales
+  const { containerRef, initialFocusRef } = useModal(isOpen, close);
 
   const acceptOffer = () => {
     trackCTA('exit_intent_accept');
@@ -127,14 +110,17 @@ export default function ExitIntentModal() {
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-premium p-8 overflow-hidden animate-in zoom-in duration-300">
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-lg bg-white rounded-3xl shadow-premium p-8 overflow-hidden animate-in zoom-in duration-300"
+      >
         <div
           className="absolute inset-x-0 top-0 h-2 bg-curve-gradient"
           aria-hidden="true"
         />
 
         <button
-          ref={closeBtnRef}
+          ref={initialFocusRef}
           type="button"
           onClick={close}
           aria-label="Cerrar oferta"

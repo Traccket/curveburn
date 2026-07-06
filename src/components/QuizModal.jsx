@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
 import { trackLead, trackCTA } from '../lib/analytics';
+import { QUIZ_DISCOUNT_CODE } from '../config/business';
+import { useModal } from '../hooks/useModal';
 import {
   X, Sparkles, ChevronRight, Flame, Battery, Apple, Scale,
   Activity, PersonStanding, Bed, Zap, Cookie, AlertCircle, TrendingDown,
   Coffee, Moon, Cloud, HeartPulse, Timer, Sun, Clock
 } from 'lucide-react';
-
-// Código de descuento que debes crear en Shopify Admin → Discounts → Create
-// Valor recomendado: 5% OFF, válido para PLAN_2_MONTHS. Sin código → no aplica descuento.
-const QUIZ_DISCOUNT_CODE = 'QUIZ5OFF';
 
 function getDiagnosticResult(answers) {
   const { goal, obstacle, age, digestion } = answers;
@@ -18,7 +16,19 @@ function getDiagnosticResult(answers) {
   if (obstacle === 'hambre' || goal === 'antojos') {
     return {
       title: 'Resistencia Metabólica por Ansiedad ⚠️',
-      description: 'Hemos detectado el problema: Tus intentos fallan porque tus <strong>picos de cortisol y glucosa</strong> te generan una ansiedad por comer incontrolable. ¡Tu fuerza de voluntad no tiene la culpa!<br/><br/><strong>EL MÉTODO CURVE</strong> es tu solución perfecta porque contiene supresores neuro-metabólicos que <strong>apagarán el hambre nerviosa de inmediato</strong>, obligando a tu cuerpo a usar tu propia grasa abdominal para obtener la energía que te falta.'
+      description: (
+        <>
+          Hemos detectado el problema: Tus intentos fallan porque tus{' '}
+          <strong>picos de cortisol y glucosa</strong> te generan una ansiedad por comer
+          incontrolable. ¡Tu fuerza de voluntad no tiene la culpa!
+          <br />
+          <br />
+          <strong>EL MÉTODO CURVE</strong> es tu solución perfecta porque contiene supresores
+          neuro-metabólicos que <strong>apagarán el hambre nerviosa de inmediato</strong>,
+          obligando a tu cuerpo a usar tu propia grasa abdominal para obtener la energía que te
+          falta.
+        </>
+      ),
     };
   }
 
@@ -26,14 +36,36 @@ function getDiagnosticResult(answers) {
   if (obstacle === 'estancado' || age === 'mature' || age === 'senior' || digestion === 'lenta' || digestion === 'hinchada') {
     return {
       title: 'Estancamiento Hormonal y Digestivo 🛑',
-      description: 'El diagnóstico es claro: Tu <strong>metabolismo basal está literalmente dormido</strong>. Por tu edad y síntomas inflamatorios, comer menos ya no te hará bajar de peso. Necesitas un choque termogénico celular.<br/><br/><strong>EL MÉTODO CURVE</strong> reactivará de forma agresiva (pero 100% segura) la quema natural de calorías, destrozando la grasa celular estancada que ninguna dieta ha podido penetrar.'
+      description: (
+        <>
+          El diagnóstico es claro: Tu <strong>metabolismo basal está literalmente dormido</strong>.
+          Por tu edad y síntomas inflamatorios, comer menos ya no te hará bajar de peso. Necesitas
+          un choque termogénico celular.
+          <br />
+          <br />
+          <strong>EL MÉTODO CURVE</strong> reactivará de forma agresiva (pero 100% segura) la quema
+          natural de calorías, destrozando la grasa celular estancada que ninguna dieta ha podido
+          penetrar.
+        </>
+      ),
     };
   }
 
   // Profile 3: The Exhausted Plateau (General lack of energy, default fallback)
   return {
     title: 'Fatiga Celular y Resistencia Focalizada 🔋',
-    description: 'Haces el esfuerzo, pero tu cuerpo ha creado una <strong>armadura que bloquea la pérdida de peso</strong> por falta de energía metabólica. En lugar de quemar grasa, tu cuerpo la está acaparando.<br/><br/>Cero excusas: <strong>EL MÉTODO CURVE</strong> romperá esa barrera adaptativa dándote horas de energía ultra-limpia mientras transforma tus células grasas en tu fuente principal de combustible.'
+    description: (
+      <>
+        Haces el esfuerzo, pero tu cuerpo ha creado una{' '}
+        <strong>armadura que bloquea la pérdida de peso</strong> por falta de energía metabólica.
+        En lugar de quemar grasa, tu cuerpo la está acaparando.
+        <br />
+        <br />
+        Cero excusas: <strong>EL MÉTODO CURVE</strong> romperá esa barrera adaptativa dándote horas
+        de energía ultra-limpia mientras transforma tus células grasas en tu fuente principal de
+        combustible.
+      </>
+    ),
   };
 }
 
@@ -62,20 +94,12 @@ export default function QuizModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  // Prevent scroll when modal is open — capturamos el valor previo y lo
-  // restauramos al cerrar para no clobberar estilos de otros componentes
-  // (ej. otro modal que también haya aplicado 'hidden').
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
+  // Scroll lock + Escape + focus trap compartidos entre todos los modales
+  const { containerRef } = useModal(isOpen, onClose);
 
-  // Timer de transición entre preguntas. Se cancela en unmount / nuevo click
-  // para evitar setState sobre componentes desmontados.
+  // Timer de transición entre preguntas y de la animación de "análisis".
+  // Se cancela en unmount / nuevo click para evitar setState sobre
+  // componentes desmontados.
   const advanceTimerRef = useRef(null);
 
   useEffect(() => {
@@ -104,7 +128,9 @@ export default function QuizModal({ isOpen, onClose }) {
     setStep(7);
     // Quiz completado → registrar como Lead (alto valor para audiencias de Meta)
     trackLead({ source: 'quiz_completed', value: 0 });
-    setTimeout(() => {
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = null;
       setStep(8);
     }, 3000); // 3 seconds analysis animation
   };
@@ -130,20 +156,28 @@ export default function QuizModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-white/40 backdrop-blur-md">
-      
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-white/40 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Test de diagnóstico metabólico"
+    >
+
       {/* Background dark gradient to pop the white modal */}
-      <div className="absolute inset-0 bg-curveDark/30" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-curveDark/30" onClick={onClose} aria-hidden="true"></div>
 
       {/* Main Box */}
-      <div className="relative w-full max-w-2xl bg-white rounded-[2rem] shadow-premium overflow-hidden border border-white/50 z-10 flex flex-col max-h-[90vh]">
-        
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-2xl bg-white rounded-[2rem] shadow-premium overflow-hidden border border-white/50 z-10 flex flex-col max-h-[90vh]"
+      >
+
         {/* Header - Progress / Close */}
         <div className="p-6 pb-2 flex items-center justify-between">
           <div className="flex-1 mr-8 relative">
             {step > 0 && step < 8 && (
               <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="bg-curveAction h-full transition-all duration-700 ease-out"
                   style={{ width: `${progressPercent}%` }}
                 ></div>
@@ -155,12 +189,14 @@ export default function QuizModal({ isOpen, onClose }) {
               </div>
             )}
           </div>
-          
-          <button 
-            onClick={onClose} 
-            className="p-2 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar test"
+            className="p-2 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -445,10 +481,9 @@ export default function QuizModal({ isOpen, onClose }) {
               <h2 className="text-2xl md:text-3xl font-display font-black text-textPrimary leading-tight mb-4">
                 {diagnosticResult.title}
               </h2>
-              <div 
-                className="text-gray-600 mb-8 max-w-sm mx-auto text-sm leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: diagnosticResult.description }}
-              />
+              <p className="text-gray-600 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                {diagnosticResult.description}
+              </p>
               
               <div className="bg-curvePink/5 border border-curvePink/20 rounded-2xl p-6 mb-8 text-left relative overflow-hidden">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-curvePink opacity-10 rounded-full blur-2xl"></div>
@@ -459,7 +494,7 @@ export default function QuizModal({ isOpen, onClose }) {
                   Como premio por tomar acción y completar tu diagnóstico médico-nutricional, hemos activado un <strong>5% de descuento adicional</strong> válido por las próximas 2 horas.
                 </p>
                 <div className="bg-white border border-curveAction/30 py-3 px-4 rounded-xl flex justify-between items-center shadow-sm">
-                  <span className="font-mono font-bold text-curveAction">QUIZ5OFF</span>
+                  <span className="font-mono font-bold text-curveAction">{QUIZ_DISCOUNT_CODE}</span>
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">ACTIVADO</span>
                 </div>
               </div>
@@ -482,14 +517,17 @@ export default function QuizModal({ isOpen, onClose }) {
   );
 }
 
-// Helper component for options to keep it clean
+// Helper component for options to keep it clean.
+// Es un <button> real para que sea operable con teclado y lectores de pantalla.
 function OptionCard({ icon, title, desc, onClick, active }) {
   return (
-    <div 
+    <button
+      type="button"
       onClick={onClick}
-      className={`group cursor-pointer rounded-2xl border-2 transition-all p-4 md:p-5 flex items-start gap-4 hover:shadow-lg ${
-        active 
-          ? 'border-curveAction bg-curvePink/5 scale-[1.01]' 
+      aria-pressed={active}
+      className={`group w-full text-left cursor-pointer rounded-2xl border-2 transition-all p-4 md:p-5 flex items-start gap-4 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction ${
+        active
+          ? 'border-curveAction bg-curvePink/5 scale-[1.01]'
           : 'border-gray-100 bg-white hover:border-gray-300 hover:bg-gray-50'
       }`}
     >
@@ -504,6 +542,6 @@ function OptionCard({ icon, title, desc, onClick, active }) {
         }`}>{title}</h3>
         <p className="text-xs md:text-sm text-gray-500 mt-1 leading-snug">{desc}</p>
       </div>
-    </div>
+    </button>
   );
 }

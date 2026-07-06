@@ -15,8 +15,66 @@ import { CONSENT_KEY, CONSENT_GRANTED, CONSENT_DENIED } from '../lib/analytics';
  * el usuario aún no ha consentido.
  */
 
+// Evento global para reabrir el banner desde cualquier parte de la app
+// (ej. link "Preferencias de cookies" en el Footer).
+export const COOKIE_SETTINGS_EVENT = 'curve:cookie-settings';
+
+/**
+ * Un ID es placeholder si está vacío, conserva el %VITE_*% sin reemplazar
+ * (variable de entorno no configurada en Vite/Vercel) o es el valor de
+ * ejemplo antiguo.
+ */
+function isPlaceholderId(value) {
+  return !value || value.includes('%') || value === 'TU_PIXEL_ID' || value === 'G-TU_GA4_ID';
+}
+
+/**
+ * Google Consent Mode v2. Declara el estado ANTES de cargar gtag.js para
+ * que Google reciba la señal de consentimiento correcta desde el primer hit.
+ * https://developers.google.com/tag-platform/security/guides/consent
+ */
+function ensureGtagStub() {
+  window.dataLayer = window.dataLayer || [];
+  if (typeof window.gtag !== 'function') {
+    window.gtag = function () {
+      window.dataLayer.push(arguments);
+    };
+  }
+}
+
+function initConsentModeDefaults() {
+  ensureGtagStub();
+  window.gtag('consent', 'default', {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    wait_for_update: 500,
+  });
+}
+
+function grantConsentMode() {
+  ensureGtagStub();
+  window.gtag('consent', 'update', {
+    analytics_storage: 'granted',
+    ad_storage: 'granted',
+    ad_user_data: 'granted',
+    ad_personalization: 'granted',
+  });
+}
+
+function denyConsentMode() {
+  ensureGtagStub();
+  window.gtag('consent', 'update', {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+  });
+}
+
 function loadMetaPixel(pixelId) {
-  if (!pixelId || pixelId === 'TU_PIXEL_ID') return;
+  if (isPlaceholderId(pixelId)) return;
   if (window.fbq) return; // ya cargado
 
   // Snippet oficial de Meta (versión compacta)
@@ -41,19 +99,21 @@ function loadMetaPixel(pixelId) {
   window.fbq('track', 'PageView');
 }
 
+// Flag propio: window.gtag ya no sirve como indicador de "script cargado"
+// porque el stub de Consent Mode lo define antes de cargar gtag.js.
+let _ga4Loaded = false;
+
 function loadGA4(ga4Id) {
-  if (!ga4Id || ga4Id === 'G-TU_GA4_ID') return;
-  if (window.gtag) return;
+  if (isPlaceholderId(ga4Id)) return;
+  if (_ga4Loaded) return;
+  _ga4Loaded = true;
 
   const script = document.createElement('script');
   script.async = true;
   script.src = `https://www.googletagmanager.com/gtag/js?id=${ga4Id}`;
   document.head.appendChild(script);
 
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function () {
-    window.dataLayer.push(arguments);
-  };
+  ensureGtagStub();
   window.gtag('js', new Date());
   window.gtag('config', ga4Id, { anonymize_ip: true });
 }
@@ -69,10 +129,8 @@ function warnIfPlaceholderIds() {
   const isDev = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
   if (!isDev) return;
 
-  const pixel = window.__META_PIXEL_ID__;
-  const ga4 = window.__GA4_ID__;
-  const pixelIsPlaceholder = !pixel || pixel === 'TU_PIXEL_ID';
-  const ga4IsPlaceholder = !ga4 || ga4 === 'G-TU_GA4_ID';
+  const pixelIsPlaceholder = isPlaceholderId(window.__META_PIXEL_ID__);
+  const ga4IsPlaceholder = isPlaceholderId(window.__GA4_ID__);
 
   if (pixelIsPlaceholder || ga4IsPlaceholder) {
     // Estilo vistoso para que el dev no lo ignore.
@@ -82,7 +140,7 @@ function warnIfPlaceholderIds() {
         (pixelIsPlaceholder ? 'Meta Pixel ' : '') +
         (pixelIsPlaceholder && ga4IsPlaceholder ? 'y ' : '') +
         (ga4IsPlaceholder ? 'GA4 ' : '') +
-        'se deshabilitaron. Edita window.__META_PIXEL_ID__ y window.__GA4_ID__ en index.html antes de deploy a producción.',
+        'se deshabilitaron. Configura VITE_META_PIXEL_ID y VITE_GA4_ID (ver .env.example) antes de deploy a producción.',
       style,
       '',
     );
@@ -99,6 +157,11 @@ export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // Consent Mode default 'denied' SIEMPRE se declara primero, antes de
+    // cualquier script de Google. Si el usuario ya aceptó, el update a
+    // 'granted' se envía justo después.
+    initConsentModeDefaults();
+
     let current = null;
     try {
       current = window.localStorage?.getItem(CONSENT_KEY);
@@ -106,20 +169,28 @@ export default function CookieBanner() {
       /* storage bloqueado */
     }
 
+    // Permite reabrir el banner desde el Footer ("Preferencias de cookies")
+    const reopen = () => setVisible(true);
+    window.addEventListener(COOKIE_SETTINGS_EVENT, reopen);
+
     if (current === CONSENT_GRANTED) {
       // Usuario ya aceptó en visitas anteriores → carga scripts
+      grantConsentMode();
       loadTrackingScripts();
-      return;
+      return () => window.removeEventListener(COOKIE_SETTINGS_EVENT, reopen);
     }
 
     if (current === CONSENT_DENIED) {
-      // Usuario rechazó → respetamos, no mostramos banner de nuevo
-      return;
+      // Usuario rechazó → respetamos (default ya es 'denied'), no mostramos banner
+      return () => window.removeEventListener(COOKIE_SETTINGS_EVENT, reopen);
     }
 
     // Primera visita → mostrar banner con un pequeño delay
     const t = setTimeout(() => setVisible(true), 1500);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener(COOKIE_SETTINGS_EVENT, reopen);
+    };
   }, []);
 
   const accept = () => {
@@ -128,6 +199,7 @@ export default function CookieBanner() {
     } catch {
       /* storage bloqueado */
     }
+    grantConsentMode();
     loadTrackingScripts();
     setVisible(false);
   };
@@ -138,6 +210,10 @@ export default function CookieBanner() {
     } catch {
       /* storage bloqueado */
     }
+    // Si venía de 'granted' y cambió de opinión, avisamos a Google.
+    // Los scripts ya cargados dejan de trackear vía Consent Mode, y
+    // analytics.js corta fbq/gtag/dataLayer con hasConsent().
+    denyConsentMode();
     setVisible(false);
   };
 

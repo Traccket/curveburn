@@ -98,7 +98,7 @@ export default function HeroSection() {
           <div className="relative z-10 w-full flex flex-col items-center justify-center">
             <div className="relative w-[80%] md:w-[90%] max-w-[450px] transition-transform duration-500 hover:scale-[1.02] rounded-[3rem] overflow-hidden shadow-[0_30px_50px_rgba(166,117,162,0.15)] ring-1 ring-black/5 bg-white">
               <img
-                src="/producto.png"
+                src="/producto.webp"
                 alt="CURVE · Fórmula termogénica premium de 60 cápsulas"
                 width="900"
                 height="900"

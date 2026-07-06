@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { trackCTA } from '../lib/analytics';
-
-// Reemplazar con el número real en producción. Se detecta automáticamente
-// como placeholder y se deshabilita el enlace para no generar 404s en wa.me.
-const WHATSAPP_NUMBER = '[WHATSAPP]';
-const WHATSAPP_IS_CONFIGURED = /^\d{8,15}$/.test(WHATSAPP_NUMBER);
-const WHATSAPP_HREF = WHATSAPP_IS_CONFIGURED
-  ? `https://wa.me/57${WHATSAPP_NUMBER}`
-  : undefined;
+// Número configurado vía VITE_WHATSAPP_NUMBER (ver .env.example). Si falta,
+// el botón se deshabilita para no generar 404s en wa.me.
+import { WHATSAPP_IS_CONFIGURED, WHATSAPP_HREF } from '../config/business';
 
 const FAQS = [
   {
@@ -82,7 +77,7 @@ export default function FAQSection() {
             type="button"
             disabled
             aria-disabled="true"
-            title="Configura el número de WhatsApp en FAQSection.jsx"
+            title="Configura VITE_WHATSAPP_NUMBER (ver .env.example)"
             className="mt-8 bg-gray-400 text-white font-bold py-3 px-8 rounded-full shadow-md flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
           >
             WhatsApp (pendiente de configurar)

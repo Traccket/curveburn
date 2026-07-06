@@ -1,32 +1,10 @@
-import { useEffect, useRef } from 'react';
 import { X, ArrowRight } from 'lucide-react';
 import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
-import { trackCTA } from '../lib/analytics';
+import { trackCTA, trackAddToCart } from '../lib/analytics';
+import { useModal } from '../hooks/useModal';
 
 export default function UpsellModal({ isOpen, onClose }) {
-  const closeBtnRef = useRef(null);
-
-  // Bloquea scroll de fondo + focus trap básico
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    // Focus al primer elemento al abrir (deferred para no interferir con la animación de entrada)
-    const focusTimer = setTimeout(() => closeBtnRef.current?.focus(), 50);
-
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      clearTimeout(focusTimer);
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const { containerRef, initialFocusRef } = useModal(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -35,6 +13,15 @@ export default function UpsellModal({ isOpen, onClose }) {
 
   const upgradeToSub = () => {
     trackCTA('upsell_accept_subscription');
+    // El AddToCart original se disparó con la variante de compra única;
+    // al aceptar el upsell re-disparamos con la variante real para que
+    // Meta/GA4 atribuyan el checkout a la suscripción y no descuadre.
+    trackAddToCart({
+      contentId: subVariant.id,
+      value: subVariant.price,
+      currency: 'COP',
+      label: `${subVariant.label} (upsell)`,
+    });
     handleCheckout(subVariant.id, 1);
     onClose();
   };
@@ -61,13 +48,16 @@ export default function UpsellModal({ isOpen, onClose }) {
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-premium p-6 overflow-hidden animate-in zoom-in duration-300 border-[2px] border-curvePink">
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-premium p-6 overflow-hidden animate-in zoom-in duration-300 border-[2px] border-curvePink"
+      >
         <div className="absolute top-0 right-0 bg-curvePink text-white text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-bl-xl">
           OFERTA DESBLOQUEADA
         </div>
 
         <button
-          ref={closeBtnRef}
+          ref={initialFocusRef}
           type="button"
           onClick={onClose}
           aria-label="Cerrar oferta"
