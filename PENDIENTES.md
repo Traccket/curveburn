@@ -1,41 +1,43 @@
-# Pendientes de Placeholders (Producción)
+# Pendientes antes del lanzamiento
 
-Los siguientes campos quedaron marcados como "skip" y deben ser rellenados antes del lanzamiento definitivo:
+Los datos de negocio ahora se configuran con **variables de entorno** (ver
+`.env.example`). En desarrollo copia `.env.example` a `.env.local`; en
+producción configúralas en **Vercel → Settings → Environment Variables**.
+Mientras falten, la landing deshabilita u oculta automáticamente los enlaces
+y el tracking afectados (no publica links rotos).
 
-## Tracking y Analytics
-- **META_PIXEL_ID (`TU_PIXEL_ID`)**:
-  - `index.html` (líneas 108, 117)
-- **GA4_ID (`G-TU_GA4_ID`)**:
-  - `index.html` (líneas 109, 118)
+## 1. Variables de entorno (un solo lugar)
 
-## Datos Comerciales y Legales
-- **WHATSAPP_NUMBER (`[WHATSAPP]`)**:
-  - `src/components/FAQSection.jsx` (línea 7)
-  - `src/components/Footer.jsx` (línea 46)
-  - `public/privacidad.html` (línea 30)
-  - `public/terminos.html` (líneas 30, 31)
-  - `public/devoluciones.html` (líneas 75, 76)
-- **RAZON_SOCIAL (`[RAZÓN SOCIAL]`)**:
-  - `src/components/Footer.jsx` (línea 144)
-  - `public/privacidad.html` (línea 29)
-  - `public/terminos.html` (líneas 29, 89)
-- **NIT (`[NIT]`)**:
-  - `src/components/Footer.jsx` (línea 144)
-  - `public/privacidad.html` (línea 29)
-  - `public/terminos.html` (línea 29)
-- **DIRECCION_COMERCIAL (`[DIRECCIÓN]`)**:
-  - `public/privacidad.html` (línea 29)
-  - `public/terminos.html` (línea 30)
-- **EMAIL_SOPORTE (`[EMAIL_SOPORTE]`)**:
-  - `src/components/Footer.jsx` (líneas 56, 130)
-  - `public/privacidad.html` (líneas 30, 72)
-  - `public/terminos.html` (líneas 30, 68, 110)
-  - `public/devoluciones.html` (líneas 33, 47, 75)
-- **REGISTRO_INVIMA (`[N° REGISTRO INVIMA]`)**:
-  - `src/components/Footer.jsx` (línea 30)
-- **USUARIO_INSTAGRAM (`[USUARIO_INSTAGRAM]`)**:
-  - `src/components/Footer.jsx` (línea 36)
-- **QUIZ_DISCOUNT_CODE (`QUIZ5OFF`)**:
-  - `src/components/QuizModal.jsx` (líneas 12, 459)
+| Variable | Qué es | Dónde conseguirla |
+|---|---|---|
+| `VITE_META_PIXEL_ID` | Meta Pixel (~16 dígitos) | Meta Events Manager |
+| `VITE_GA4_ID` | GA4 (`G-XXXXXXXXXX`) | Google Analytics → Admin → Data Streams |
+| `VITE_LEGAL_NAME` | Razón social | Cámara de Comercio |
+| `VITE_NIT` | NIT | RUT |
+| `VITE_INVIMA` | N° registro sanitario | INVIMA |
+| `VITE_SUPPORT_EMAIL` | Email de soporte | — |
+| `VITE_WHATSAPP_NUMBER` | Solo dígitos, sin +57 | — |
+| `VITE_INSTAGRAM_USER` | Usuario sin @ | — |
+| `VITE_QUIZ_DISCOUNT_CODE` | Default `QUIZ5OFF` | Crear en Shopify Admin → Discounts |
 
-*Nota: Reemplazar manualmente antes del lanzamiento final de la landing page.*
+## 2. Páginas legales (editar HTML a mano)
+
+`public/privacidad.html`, `public/terminos.html` y `public/devoluciones.html`
+son HTML estático y **no** leen variables de entorno. Reemplazar ahí:
+`[FECHA DD/MM/AAAA]`, `[RAZÓN SOCIAL]`, `[NIT]`, `[DIRECCIÓN]`,
+`[EMAIL_SOPORTE]`, `[WHATSAPP]`, `[N° REGISTRO INVIMA]`.
+Son requisito legal (Ley 1581 Habeas Data + Ley 1480 Estatuto del Consumidor).
+
+## 3. Verificaciones en Shopify Admin
+
+- El código `QUIZ5OFF` (o el valor de `VITE_QUIZ_DISCOUNT_CODE`) debe existir
+  en Discounts, o el checkout del quiz llegará sin descuento.
+- El selling plan `5465538801` ("Plan 2 meses CURVE") debe seguir activo antes
+  de poner `SUBSCRIPTIONS_ENABLED: true` en `src/lib/shopify.js`.
+
+## 4. Al validar la CSP en producción
+
+`vercel.json` tiene la CSP en modo `Content-Security-Policy-Report-Only`.
+Después de configurar los pixel IDs reales y verificar en la consola del
+navegador que no hay violaciones, renombrar el header a
+`Content-Security-Policy` para que bloquee de verdad.

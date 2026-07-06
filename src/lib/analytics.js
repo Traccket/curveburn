@@ -53,8 +53,11 @@ function gtag(eventName, payload = {}) {
 
 /**
  * dataLayer (GTM compat) — útil incluso sin gtag directo.
+ * También respeta consentimiento: si algún día se conecta GTM, los tags
+ * no deben recibir eventos de usuarios que no aceptaron cookies.
  */
 function pushDataLayer(payload) {
+  if (!hasConsent()) return;
   if (typeof window === 'undefined') return;
   window.dataLayer = window.dataLayer || [];
   safeCall(() => window.dataLayer.push(payload));

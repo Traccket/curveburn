@@ -73,7 +73,16 @@ export function buildCheckoutUrl(variantId, quantity = 1, options = {}) {
     base = `https://${SHOPIFY_CONFIG.DOMAIN}/cart/${variantIdStr}:${qty}`;
   }
 
-  if (options.discount) params.append('discount', options.discount);
+  // Los códigos de descuento de Shopify son alfanuméricos; un valor con
+  // caracteres raros rompería el checkout, así que se omite en vez de fallar.
+  if (options.discount) {
+    const discount = String(options.discount).trim();
+    if (/^[A-Za-z0-9_-]+$/.test(discount)) {
+      params.append('discount', discount);
+    } else if (import.meta?.env?.DEV) {
+      console.warn(`[shopify] código de descuento inválido, se omite: ${discount}`);
+    }
+  }
   if (options.utmSource) params.append('utm_source', options.utmSource);
   if (options.utmMedium) params.append('utm_medium', options.utmMedium);
   if (options.utmCampaign) params.append('utm_campaign', options.utmCampaign);
@@ -87,7 +96,13 @@ export function buildCheckoutUrl(variantId, quantity = 1, options = {}) {
  * Útil para disparar eventos de tracking con datos correctos.
  */
 function findVariantById(variantId) {
-  return Object.values(SHOPIFY_CONFIG.VARIANTS).find((v) => v.id === variantId) || null;
+  const found = Object.values(SHOPIFY_CONFIG.VARIANTS).find((v) => v.id === variantId) || null;
+  if (!found && import.meta?.env?.DEV) {
+    console.warn(
+      `[shopify] variantId ${variantId} no está en SHOPIFY_CONFIG.VARIANTS — el tracking irá sin precio/label`,
+    );
+  }
+  return found;
 }
 
 // Guard module-level para prevenir double-submit. Un usuario que hace doble click
@@ -147,7 +162,14 @@ export function handleCheckout(variantId, quantity = 1, options = {}) {
   // evitar que el usuario perciba la página como "colgada".
   const REDIRECT_DELAY_MS = 150;
   setTimeout(() => {
-    window.location.href = url;
+    try {
+      window.location.href = url;
+    } catch (err) {
+      // Si el navegador bloquea la navegación, liberamos el guard de inmediato
+      // para que el usuario pueda reintentar sin esperar los 2s del fallback.
+      console.error('[shopify] redirect al checkout bloqueado:', err);
+      _isRedirecting = false;
+    }
   }, REDIRECT_DELAY_MS);
 
   // Fallback: si por alguna razón el navegador no dispara el redirect en 2s,

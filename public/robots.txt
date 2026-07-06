@@ -1,9 +1,8 @@
 # robots.txt for curve.com.co
+# Las páginas legales usan <meta name="robots" content="noindex"> en su HTML;
+# no se bloquean aquí porque Disallow impediría que Google lea ese meta tag.
 User-agent: *
 Allow: /
-Disallow: /privacidad.html
-Disallow: /terminos.html
-Disallow: /devoluciones.html
 
 # Sitemap
 Sitemap: https://curve.com.co/sitemap.xml

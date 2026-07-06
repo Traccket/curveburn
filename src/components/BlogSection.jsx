@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Share2, Link as LinkIcon, ArrowLeft, ArrowUpRight, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useModal } from '../hooks/useModal';
 
 const BLOG_POSTS = [
   {
@@ -7,7 +8,7 @@ const BLOG_POSTS = [
     tag: "Ciencia Metabólica",
     title: "¿Por qué tu metabolismo se estancó? La verdad del Cortisol.",
     excerpt: "Entiende qué es la tumba metabólica y cómo tus hormonas del estrés están bloqueando la quema de abdomen de forma silenciosa...",
-    image: "/blog-1.png",
+    image: "/blog-1.webp",
     readTime: "4 MIN"
   },
   {
@@ -15,7 +16,7 @@ const BLOG_POSTS = [
     tag: "Salud Real",
     title: "El mito de comer menos: Por qué las dietas extremas te engordan.",
     excerpt: "Las calorías no son matemáticas perfectas. Restringirte sin control daña tu termogénesis celular, descubre lo que la ciencia dice hoy.",
-    image: "/blog-2.png",
+    image: "/blog-2.webp",
     readTime: "3 MIN"
   },
   {
@@ -23,7 +24,7 @@ const BLOG_POSTS = [
     tag: "Fisiología Oculta",
     title: "Termogénesis 101: Cómo obligar a tu cuerpo a usar grasa.",
     excerpt: "No tienes que correr dos horas al día. Hay procesos bioquímicos que pueden activarse de forma natural para crear un efecto caldera...",
-    image: "/blog-3.png",
+    image: "/blog-3.webp",
     readTime: "5 MIN"
   },
   {
@@ -31,7 +32,7 @@ const BLOG_POSTS = [
     tag: "Neuro-Nutrición",
     title: "Antojos nocturnos: El ciclo del azúcar y cómo apagarlo de raíz.",
     excerpt: "Tus visitas a la nevera a las 10 PM no son falta de voluntad, son picos de glicemia y caídas de dopamina que deben hackearse inteligentemente.",
-    image: "/blog-4.png",
+    image: "/blog-4.webp",
     readTime: "3 MIN"
   }
 ];
@@ -69,10 +70,14 @@ export default function BlogSection() {
         >
           <div className="md:w-1/2 relative overflow-hidden h-64 md:h-auto">
             <div className="absolute inset-0 bg-curveDark/20 z-10 group-hover:bg-transparent transition-all duration-500"></div>
-            <img 
-              src={BLOG_POSTS[0].image} 
+            <img
+              src={BLOG_POSTS[0].image}
               alt={BLOG_POSTS[0].title}
-              className="w-full h-full object-cover transform scale-105 group-hover:scale-110 transition-transform duration-700" 
+              width="1024"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover transform scale-105 group-hover:scale-110 transition-transform duration-700"
             />
             <div className="absolute top-4 left-4 z-20 flex gap-2">
               <span className="bg-white/90 backdrop-blur text-curveAction text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
@@ -104,10 +109,14 @@ export default function BlogSection() {
         >
           <div className="relative h-48 overflow-hidden">
             <div className="absolute inset-0 bg-curveDark/20 z-10 group-hover:bg-transparent transition-all duration-500"></div>
-            <img 
-              src={BLOG_POSTS[1].image} 
+            <img
+              src={BLOG_POSTS[1].image}
               alt={BLOG_POSTS[1].title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              width="1024"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
           </div>
           <div className="p-6 flex-1 flex flex-col justify-between bg-white/50">
@@ -131,10 +140,14 @@ export default function BlogSection() {
         >
           <div className="relative h-48 overflow-hidden">
             <div className="absolute inset-0 bg-curveDark/20 z-10 group-hover:bg-transparent transition-all duration-500"></div>
-            <img 
-              src={BLOG_POSTS[2].image} 
+            <img
+              src={BLOG_POSTS[2].image}
               alt={BLOG_POSTS[2].title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              width="1024"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
           </div>
           <div className="p-6 flex-1 flex flex-col justify-between bg-white/50">
@@ -158,10 +171,14 @@ export default function BlogSection() {
         >
           <div className="sm:w-2/5 relative h-48 sm:h-auto overflow-hidden">
              <div className="absolute inset-0 bg-curveDark/20 z-10 group-hover:bg-transparent transition-all duration-500"></div>
-             <img 
-              src={BLOG_POSTS[3].image} 
+             <img
+              src={BLOG_POSTS[3].image}
               alt={BLOG_POSTS[3].title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              width="1024"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
           </div>
           <div className="sm:w-3/5 p-6 flex flex-col justify-center bg-white/50">
@@ -186,31 +203,37 @@ export default function BlogSection() {
 
 /* MODAL COMPONENT (Isolated for readability, placed here for architectural simplicity) */
 function ArticleModal({ post, onClose }) {
-  // Prevent scroll when open
-  useEffect(() => {
-    if (post) {document.body.style.overflow = 'hidden';} 
-    else {document.body.style.overflow = 'auto';}
-    return () => { document.body.style.overflow = 'auto'; };
-  }, [post]);
+  // Scroll lock + Escape + focus trap compartidos entre todos los modales
+  const { containerRef, initialFocusRef } = useModal(!!post, onClose);
 
   if (!post) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center sm:p-6 bg-white/80 backdrop-blur-md animate-in fade-in duration-300">
-      
+    <div
+      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center sm:p-6 bg-white/80 backdrop-blur-md animate-in fade-in duration-300"
+      role="dialog"
+      aria-modal="true"
+      aria-label={post.title}
+    >
+
       {/* Background layer click to close */}
-      <div className="absolute inset-0 z-0" onClick={onClose}></div>
+      <div className="absolute inset-0 z-0" onClick={onClose} aria-hidden="true"></div>
 
       {/* Main Full-Screen-like Modal Panel */}
-      <div className="relative w-full h-[95vh] sm:h-[90vh] max-w-4xl bg-white sm:rounded-[3rem] shadow-premium overflow-hidden z-10 flex flex-col border border-gray-100 translate-y-0 sm:translate-y-4 animate-in slide-in-from-bottom-24 sm:slide-in-from-bottom-8 duration-500">
-        
+      <div
+        ref={containerRef}
+        className="relative w-full h-[95vh] sm:h-[90vh] max-w-4xl bg-white sm:rounded-[3rem] shadow-premium overflow-hidden z-10 flex flex-col border border-gray-100 translate-y-0 sm:translate-y-4 animate-in slide-in-from-bottom-24 sm:slide-in-from-bottom-8 duration-500"
+      >
+
         {/* Header Bar */}
         <div className="flex items-center justify-between p-4 px-6 md:px-10 border-b border-gray-100 bg-white/90 backdrop-blur sticky top-0 z-20">
-          <button 
-            onClick={onClose} 
-            className="flex items-center gap-2 text-gray-400 hover:text-textPrimary font-bold text-sm tracking-wider uppercase transition-colors"
+          <button
+            ref={initialFocusRef}
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-2 text-gray-400 hover:text-textPrimary font-bold text-sm tracking-wider uppercase transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction rounded"
           >
-            <ArrowLeft className="w-5 h-5" /> Regresar
+            <ArrowLeft className="w-5 h-5" aria-hidden="true" /> Regresar
           </button>
           
           <div className="flex items-center gap-4">
@@ -218,7 +241,7 @@ function ArticleModal({ post, onClose }) {
                <LinkIcon className="w-4 h-4" />
              </button>
              <a href="#comprar" onClick={onClose} className="px-6 py-2.5 bg-curveAction text-white font-bold text-sm rounded-full hover:brightness-110 transition-all shadow-md">
-               Comprar Curso
+               Comprar CURVE
              </a>
           </div>
         </div>
@@ -228,7 +251,14 @@ function ArticleModal({ post, onClose }) {
           
           {/* Header Image */}
           <div className="w-full h-64 md:h-[400px] relative">
-            <img src={post.image} alt="Cover" className="w-full h-full object-cover" />
+            <img
+              src={post.image}
+              alt=""
+              width="1024"
+              height="1024"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent"></div>
           </div>
 

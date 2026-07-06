@@ -31,12 +31,12 @@ export default function Header({ onOpenQuiz }) {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <a
-          href="#"
+          href="#top"
           aria-label="Ir al inicio · CURVE"
           className="flex items-center gap-2 transition-transform hover:scale-105"
         >
           <img
-            src="/logo.png"
+            src="/logo.webp"
             alt="CURVE"
             width="160"
             height="56"
@@ -52,7 +52,7 @@ export default function Header({ onOpenQuiz }) {
           className="hidden lg:flex items-center gap-1 font-display text-xs tracking-widest font-black uppercase text-gray-500"
         >
           <a
-            href="#"
+            href="#top"
             className="px-4 py-2.5 rounded-full hover:bg-curvePink/10 hover:text-curveAction transition-all duration-300"
           >
             Inicio

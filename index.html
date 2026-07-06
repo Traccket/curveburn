@@ -28,7 +28,7 @@
     <meta property="og:url" content="https://curve.com.co/" />
     <meta property="og:title" content="CURVE · Quemador de Grasa Premium para Mujeres" />
     <meta property="og:description" content="Termogénesis inteligente + control de ansiedad. Resultados reales en miles de mujeres en Colombia. Envío gratis con suscripción." />
-    <meta property="og:image" content="https://curve.com.co/og-image.png" />
+    <meta property="og:image" content="https://curve.com.co/og-image.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="CURVE - Fórmula termogénica premium" />
@@ -40,14 +40,14 @@
     <meta name="twitter:url" content="https://curve.com.co/" />
     <meta name="twitter:title" content="CURVE · Quemador de Grasa Premium para Mujeres" />
     <meta name="twitter:description" content="Termogénesis inteligente + control de ansiedad. Resultados reales. Envío gratis con suscripción." />
-    <meta name="twitter:image" content="https://curve.com.co/og-image.png" />
+    <meta name="twitter:image" content="https://curve.com.co/og-image.jpg" />
 
     <!-- Performance: Preconnect & Preload -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://toplinenatural.myshopify.com" />
     <link rel="dns-prefetch" href="https://toplinenatural.myshopify.com" />
-    <link rel="preload" as="image" href="/producto.png" fetchpriority="high" />
+    <link rel="preload" as="image" type="image/webp" href="/producto.webp" fetchpriority="high" />
 
     <!-- Fonts (Inter for body + Outfit for display) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
@@ -58,7 +58,7 @@
       "@context": "https://schema.org/",
       "@type": "Product",
       "name": "CURVE Quemador de Grasa Premium",
-      "image": "https://curve.com.co/producto.png",
+      "image": "https://curve.com.co/producto.webp",
       "description": "Fórmula termogénica premium para mujeres. Convierte tejido adiposo en energía, controla la ansiedad por comer y eleva la quema basal sin efecto rebote.",
       "brand": {
         "@type": "Brand",
@@ -103,19 +103,21 @@
 
     <!--
       ============================================
-      🏷️  TRACKING — REEMPLAZA LOS PLACEHOLDERS
+      🏷️  TRACKING — IDs vía variables de entorno
       ============================================
-      1. META PIXEL: reemplaza TU_PIXEL_ID con tu ID de 16 dígitos
-      2. GA4: reemplaza G-TU_GA4_ID con tu ID (formato G-XXXXXXX)
-      3. Los pixeles se cargan SOLO cuando el usuario acepta cookies
-         (ver CookieBanner.jsx). Esto cumple con la Ley 1581 de Colombia.
+      Vite reemplaza los tokens de entorno en build. Configura en .env.local
+      (desarrollo) o en Vercel → Settings → Environment Variables:
+        VITE_META_PIXEL_ID  → ID de Meta Pixel (16 dígitos)
+        VITE_GA4_ID         → ID de GA4 (formato G-XXXXXXX)
+      Ver .env.example. Si no están configuradas, CookieBanner las
+      detecta como placeholder y no carga ningún script.
+      Los pixeles se cargan SOLO cuando el usuario acepta cookies
+      (ver CookieBanner.jsx). Esto cumple con la Ley 1581 de Colombia.
       ============================================
     -->
-
-    <!-- Meta Pixel (carga diferida - ver CookieBanner) -->
     <script>
-      window.__META_PIXEL_ID__ = 'TU_PIXEL_ID';
-      window.__GA4_ID__ = 'G-TU_GA4_ID';
+      window.__META_PIXEL_ID__ = '%VITE_META_PIXEL_ID%';
+      window.__GA4_ID__ = '%VITE_GA4_ID%';
     </script>
   </head>
   <body>

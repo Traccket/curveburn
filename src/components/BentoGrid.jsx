@@ -6,19 +6,25 @@ export default function BentoGrid() {
       title: 'Termogénesis Inteligente',
       desc: 'Sube la temperatura y fuerza al cuerpo a oxidar la grasa rebelde.',
       bg: 'bg-[#C7A3C8]', // Soft Purple
-      image: '/beneficio-1.png'
+      image: '/beneficio-1.webp',
+      width: 1024,
+      height: 666
     },
     {
       title: 'Control de Ansiedad',
       desc: 'Bloquea atracones y regula el cortisol durante todo el día de forma natural.',
       bg: 'bg-[#F2A7B8]', // Soft Pink/Coral
-      image: '/beneficio-2.png'
+      image: '/beneficio-2.webp',
+      width: 1024,
+      height: 1024
     },
     {
       title: 'Energía Limpia',
       desc: 'Disfruta de foco mental sostenido sin rebotes ni palpitaciones molestos.',
       bg: 'bg-[#DCD8F3]', // Soft Indigo/Lavander
-      image: '/beneficio-3.png'
+      image: '/beneficio-3.webp',
+      width: 1024,
+      height: 666
     }
   ];
 
@@ -51,7 +57,15 @@ export default function BentoGrid() {
             {/* Visual Box with Image */}
             <div className="mt-auto relative w-full flex justify-center pb-0">
               <div className="w-[92%] h-56 rounded-t-[2rem] bg-white/30 backdrop-blur-md border-t border-x border-white/50 flex items-center justify-center overflow-hidden translate-y-0 group-hover:-translate-y-2 group-hover:h-60 transition-all duration-500 shadow-inner">
-                <img src={item.image} alt={item.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  width={item.width}
+                  height={item.height}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                />
               </div>
             </div>
             
