@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
+import { SHOPIFY_CONFIG } from '../lib/shopify';
+import { beginCheckout } from '../lib/localCheckout';
 import { trackAddToCart, trackViewContent } from '../lib/analytics';
 import { ShieldCheck, CheckCircle2, ShoppingCart, Truck } from 'lucide-react';
 import UpsellModal from './UpsellModal';
@@ -77,7 +78,7 @@ export default function HeroSection() {
     if (!isSubscription && SUBS_ENABLED) {
       setIsUpsellOpen(true);
     } else {
-      handleCheckout(selectedVariant.id, 1);
+      beginCheckout(selectedVariant.id, 1);
     }
   };
 

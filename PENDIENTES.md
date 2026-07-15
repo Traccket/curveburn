@@ -28,6 +28,20 @@ son HTML estático y **no** leen variables de entorno. Reemplazar ahí:
 `[EMAIL_SOPORTE]`, `[WHATSAPP]`, `[N° REGISTRO INVIMA]`.
 Son requisito legal (Ley 1581 Habeas Data + Ley 1480 Estatuto del Consumidor).
 
+## 2.5 Checkout contra-entrega (Sendura)
+
+Variables del **servidor** en Vercel (sin prefijo `VITE_`, marcar Production
+y Preview):
+
+| Variable | Qué es |
+|---|---|
+| `SENDURA_API_TOKEN` | Token de la tienda (panel Sendura → Tiendas/Shops). ⚠️ El token probado el 2026-07-06 fue rechazado como inválido — verificar/regenerar. |
+| `SENDURA_SKU` | SKU del producto CURVE tal como existe en Inventarios de Sendura |
+| `SENDURA_SKU_PLAN` | (Opcional) SKU del plan 2 meses si es distinto |
+
+Mientras falten, el checkout local muestra error con botón de respaldo
+"pagar online" (Shopify), así no se pierde ninguna venta.
+
 ## 3. Verificaciones en Shopify Admin
 
 - El código `QUIZ5OFF` (o el valor de `VITE_QUIZ_DISCOUNT_CODE`) debe existir
