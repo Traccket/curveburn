@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
 import {
-  BEGIN_CHECKOUT_EVENT, COVERAGE_CITIES, submitLocalOrder,
+  BEGIN_CHECKOUT_EVENT, DEPARTMENTS, submitLocalOrder,
 } from '../lib/localCheckout';
 import { trackCTA, trackInitiateCheckout, trackPurchase } from '../lib/analytics';
 import { useModal } from '../hooks/useModal';
@@ -40,7 +40,9 @@ export default function CheckoutFlow() {
   // request = null (cerrado) | { variantId, quantity, options }
   const [request, setRequest] = useState(null);
   const [step, setStep] = useState('city'); // city | form | sending | success | error
-  const [cityId, setCityId] = useState(null);
+  const [deptId, setDeptId] = useState('');
+  const [cityLabel, setCityLabel] = useState('');
+  const [cityId, setCityId] = useState(null); // id de ciudad con cobertura (o null)
   const [qty, setQty] = useState(1);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
@@ -53,6 +55,8 @@ export default function CheckoutFlow() {
       if (!findVariant(variantId)) return;
       setRequest({ variantId, quantity: quantity || 1, options: options || {} });
       setStep('city');
+      setDeptId('');
+      setCityLabel('');
       setCityId(null);
       setQty(quantity || 1);
       setForm(EMPTY_FORM);
@@ -86,17 +90,40 @@ export default function CheckoutFlow() {
     handleCheckout(request.variantId, request.quantity, request.options);
   };
 
-  const selectCity = (id) => {
-    trackCTA(`checkout_gate_city_${id}`);
-    setCityId(id);
-    setStep('form');
-    // Abrir el formulario local ES iniciar el checkout a efectos de ads.
-    trackInitiateCheckout({
-      contentId: variant.id,
-      value: total,
-      currency: 'COP',
-      label: `${variant.label} (contra entrega)`,
-    });
+  const dept = DEPARTMENTS.find((d) => d.id === deptId) || null;
+  const selectedCity = dept?.cities?.find((c) => c.label === cityLabel) || null;
+  // Ruta resuelta: 'local' (contra entrega), 'shopify' (envío nacional) o null (falta elegir)
+  const route = !dept
+    ? null
+    : dept.cities
+      ? selectedCity
+        ? selectedCity.coveredId ? 'local' : 'shopify'
+        : null
+      : 'shopify';
+
+  const onSelectDept = (e) => {
+    const id = e.target.value;
+    setDeptId(id);
+    const d = DEPARTMENTS.find((x) => x.id === id);
+    // Si el departamento tiene una sola ciudad (Bogotá D.C.), preseleccionarla.
+    setCityLabel(d?.cities?.length === 1 ? d.cities[0].label : '');
+  };
+
+  const continueFromLocation = () => {
+    if (route === 'local') {
+      trackCTA(`checkout_gate_city_${selectedCity.coveredId}`);
+      setCityId(selectedCity.coveredId);
+      setStep('form');
+      // Abrir el formulario local ES iniciar el checkout a efectos de ads.
+      trackInitiateCheckout({
+        contentId: variant.id,
+        value: total,
+        currency: 'COP',
+        label: `${variant.label} (contra entrega)`,
+      });
+    } else if (route === 'shopify') {
+      goToShopify(dept.cities ? 'city_no_coverage' : 'dept_no_coverage');
+    }
   };
 
   const setField = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -150,8 +177,6 @@ export default function CheckoutFlow() {
     }
   };
 
-  const cityLabel = COVERAGE_CITIES.find((c) => c.id === cityId)?.label || '';
-
   return (
     <div
       className="fixed inset-0 z-[130] flex items-center justify-center p-4"
@@ -185,39 +210,74 @@ export default function CheckoutFlow() {
 
         <div className="p-6 md:p-8 pt-8 overflow-y-auto custom-scrollbar">
 
-          {/* PASO 1: CIUDAD */}
+          {/* PASO 1: UBICACIÓN (departamento → ciudad) */}
           {step === 'city' && (
             <div>
               <div className="w-12 h-12 rounded-full bg-curvePink/10 flex items-center justify-center mb-4">
                 <MapPin className="w-6 h-6 text-curveAction" aria-hidden="true" />
               </div>
               <h2 className="text-2xl font-black text-textPrimary leading-tight mb-2">
-                ¿A qué ciudad va tu pedido?
+                ¿A dónde va tu pedido?
               </h2>
               <p className="text-sm text-gray-500 mb-5">
-                En estas ciudades entregamos con mensajero propio y{' '}
+                En varias ciudades entregamos con mensajero propio y{' '}
                 <strong className="text-textPrimary">pagas al recibir</strong> 💵
               </p>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                {COVERAGE_CITIES.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => selectCity(c.id)}
-                    className="text-left rounded-xl border-2 border-gray-100 bg-white hover:border-curveAction hover:bg-[#fff4f8] transition-all px-4 py-3 font-bold text-sm text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction"
-                  >
-                    {c.label}
-                  </button>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                Departamento
+              </label>
+              <select
+                value={deptId}
+                onChange={onSelectDept}
+                className="w-full rounded-xl border-2 border-gray-100 bg-white px-4 py-3 text-sm font-semibold text-gray-800 focus:outline-none focus:border-curveAction transition-colors appearance-none"
+              >
+                <option value="" disabled>Selecciona tu departamento…</option>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
                 ))}
-              </div>
+              </select>
+
+              {dept?.cities && dept.cities.length > 1 && (
+                <>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5 mt-4">
+                    Ciudad / Municipio
+                  </label>
+                  <select
+                    value={cityLabel}
+                    onChange={(e) => setCityLabel(e.target.value)}
+                    className="w-full rounded-xl border-2 border-gray-100 bg-white px-4 py-3 text-sm font-semibold text-gray-800 focus:outline-none focus:border-curveAction transition-colors appearance-none"
+                  >
+                    <option value="" disabled>Selecciona tu ciudad…</option>
+                    {dept.cities.map((c) => (
+                      <option key={c.label} value={c.label}>
+                        {c.label}{c.coveredId ? ' — 💵 pago contra entrega' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+
+              {route === 'local' && (
+                <p className="mt-4 text-sm font-semibold text-green-700 bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center gap-2">
+                  <Banknote className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  En {cityLabel} pagas al recibir, con mensajero propio.
+                </p>
+              )}
+              {route === 'shopify' && (
+                <p className="mt-4 text-sm font-semibold text-curvePurple bg-curvePink/5 border border-curvePink/20 rounded-xl px-4 py-3 flex items-center gap-2">
+                  <Truck className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  Llegamos con envío nacional — pago online seguro.
+                </p>
+              )}
 
               <button
                 type="button"
-                onClick={() => goToShopify('other_city')}
-                className="mt-4 w-full text-center text-sm text-gray-500 hover:text-curveAction underline transition-colors py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction rounded"
+                onClick={continueFromLocation}
+                disabled={!route}
+                className="mt-5 w-full bg-curveAction text-white font-black py-4 rounded-full shadow-premium hover:brightness-110 active:scale-[0.98] transition-all text-base flex justify-center items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-curveAction disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
               >
-                Mi ciudad no está en la lista → pagar online
+                Continuar <ChevronRight className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
           )}
