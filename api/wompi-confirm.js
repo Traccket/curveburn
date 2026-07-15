@@ -24,13 +24,19 @@ export default async function handler(req, res) {
     return res.status(422).json({ status: 'error', message: parsed.error });
   }
 
-  // Consultar la transacción a Wompi (endpoint público de solo lectura)
+  // Consultar la transacción a Wompi (endpoint público de solo lectura).
+  // Con llaves pub_test_ se consulta el sandbox — permite probar todo el
+  // flujo de pago sin dinero real.
+  const wompiBase = (process.env.WOMPI_PUBLIC_KEY || '').startsWith('pub_test_')
+    ? 'https://sandbox.wompi.co'
+    : 'https://production.wompi.co';
+
   let tx;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     const wompiRes = await fetch(
-      `https://production.wompi.co/v1/transactions/${encodeURIComponent(transactionId)}`,
+      `${wompiBase}/v1/transactions/${encodeURIComponent(transactionId)}`,
       { signal: controller.signal },
     );
     clearTimeout(timeout);
