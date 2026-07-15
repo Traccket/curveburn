@@ -35,8 +35,8 @@ y Preview):
 
 | Variable | Qué es |
 |---|---|
-| `SENDURA_API_TOKEN` | Token de la tienda (panel Sendura → Tiendas/Shops). ⚠️ El token probado el 2026-07-06 fue rechazado como inválido — verificar/regenerar. |
-| `SENDURA_SKU` | SKU del producto CURVE tal como existe en Inventarios de Sendura |
+| `SENDURA_API_TOKEN` | Token de la tienda (panel Sendura → Tiendas/Shops). Token regenerado y validado OK el 2026-07-06. |
+| `SENDURA_SKU` | `134765` (confirmar que está activo en Inventarios de Sendura) |
 | `SENDURA_SKU_PLAN` | (Opcional) SKU del plan 2 meses si es distinto |
 
 Mientras falten, el checkout local muestra error con botón de respaldo
