@@ -120,27 +120,88 @@ export function beginCheckout(variantId, quantity = 1, options = {}) {
   );
 }
 
-/**
- * Envía el pedido local a nuestra función serverless.
- * Devuelve { ok, data } — nunca lanza, para que el modal siempre pueda
- * mostrar un estado de error con fallback a Shopify.
- */
-export async function submitLocalOrder(payload) {
+const NETWORK_ERROR = {
+  message: 'No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo.',
+  fallbackToShopify: true,
+};
+
+async function post(url, payload) {
   try {
-    const res = await fetch('/api/orders', {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
-    return { ok: res.status === 201, data };
+    return { httpStatus: res.status, data };
   } catch {
-    return {
-      ok: false,
-      data: {
-        message: 'No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo.',
-        fallbackToShopify: true,
-      },
-    };
+    return { httpStatus: 0, data: NETWORK_ERROR };
   }
+}
+
+/**
+ * Crea un pedido contra entrega en Sendura vía nuestra función serverless.
+ * Devuelve { ok, data } — nunca lanza, para que el modal siempre pueda
+ * mostrar un estado de error con fallback a Shopify.
+ */
+export async function submitLocalOrder(payload) {
+  const { httpStatus, data } = await post('/api/orders', payload);
+  return { ok: httpStatus === 201, data };
+}
+
+// ============================================================
+// Pago online con Wompi (el pedido llega a Sendura como pagado)
+// ============================================================
+
+// Guarda el pedido pendiente mientras el cliente está en el checkout de
+// Wompi (la página se abandona y se vuelve con ?wompi_return=1&id=...).
+export const WOMPI_PENDING_KEY = 'curve_wompi_pending';
+
+/**
+ * Pide al servidor una sesión firmada de Wompi y redirige al checkout.
+ * Antes de redirigir persiste el pedido en localStorage para retomarlo
+ * al volver. Devuelve { ok, data } solo si algo falló (si va bien, navega).
+ */
+export async function startWompiPayment(orderPayload, meta = {}) {
+  const { httpStatus, data } = await post('/api/wompi-session', orderPayload);
+  if (httpStatus !== 200 || !data.checkoutUrl) {
+    return { ok: false, data };
+  }
+  try {
+    window.localStorage?.setItem(
+      WOMPI_PENDING_KEY,
+      JSON.stringify({ order: orderPayload, reference: data.reference, ...meta }),
+    );
+  } catch {
+    return { ok: false, data: { message: 'Tu navegador bloquea el almacenamiento necesario para el pago online. Usa pago contra entrega.' } };
+  }
+  window.location.href = data.checkoutUrl;
+  return { ok: true, data };
+}
+
+/** Lee y limpia el pedido pendiente de Wompi al volver del checkout. */
+export function readWompiPending() {
+  try {
+    const raw = window.localStorage?.getItem(WOMPI_PENDING_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearWompiPending() {
+  try {
+    window.localStorage?.removeItem(WOMPI_PENDING_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
+/**
+ * Confirma la transacción con el servidor (que la verifica contra Wompi y
+ * crea el pedido en Sendura). Devuelve { ok, pending, data }.
+ */
+export async function confirmWompiPayment({ transactionId, reference, order }) {
+  const { httpStatus, data } = await post('/api/wompi-confirm', { transactionId, reference, order });
+  return { ok: httpStatus === 201, pending: httpStatus === 202, data };
 }

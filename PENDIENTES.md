@@ -42,6 +42,19 @@ y Preview):
 Mientras falten, el checkout local muestra error con botón de respaldo
 "pagar online" (Shopify), así no se pierde ninguna venta.
 
+## 2.6 Pago online en el checkout propio (Wompi)
+
+Variables del **servidor** en Vercel (sin `VITE_`, Production y Preview):
+
+| Variable | Qué es |
+|---|---|
+| `WOMPI_PUBLIC_KEY` | Llave pública de producción (`pub_prod_...`) |
+| `WOMPI_INTEGRITY_SECRET` | "Secreto de integridad" — Wompi → Desarrolladores |
+
+La llave **privada** de Wompi NO se usa. Mientras falten estas variables,
+la opción "Pagar ahora" del checkout local muestra error y el cliente puede
+usar pago contra entrega.
+
 ## 3. Verificaciones en Shopify Admin
 
 - El código `QUIZ5OFF` (o el valor de `VITE_QUIZ_DISCOUNT_CODE`) debe existir

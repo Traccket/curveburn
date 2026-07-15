@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   X, MapPin, Truck, Banknote, CheckCircle2, ChevronRight, Loader2, AlertTriangle,
-  Minus, Plus,
+  Minus, Plus, CreditCard,
 } from 'lucide-react';
 import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
 import {
   BEGIN_CHECKOUT_EVENT, DEPARTMENTS, submitLocalOrder,
+  startWompiPayment, readWompiPending, clearWompiPending, confirmWompiPayment,
 } from '../lib/localCheckout';
 import { trackCTA, trackInitiateCheckout, trackPurchase } from '../lib/analytics';
 import { useModal } from '../hooks/useModal';
@@ -46,7 +47,8 @@ export default function CheckoutFlow() {
   const [qty, setQty] = useState(1);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
-  const [result, setResult] = useState(null); // { orderNumber, guia, total }
+  const [payMethod, setPayMethod] = useState('cod'); // cod (contra entrega) | wompi (online)
+  const [result, setResult] = useState(null); // { orderNumber, guia, total, paid }
   const [serverError, setServerError] = useState(null); // { message, fallbackToShopify }
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function CheckoutFlow() {
       setQty(quantity || 1);
       setForm(EMPTY_FORM);
       setFormError('');
+      setPayMethod('cod');
       setResult(null);
       setServerError(null);
     };
@@ -68,10 +71,79 @@ export default function CheckoutFlow() {
     return () => window.removeEventListener(BEGIN_CHECKOUT_EVENT, onBegin);
   }, []);
 
+  // Al volver del checkout de Wompi (?wompi_return=1&id=...): retomar el
+  // pedido guardado, verificar el pago con el servidor (polling — PSE puede
+  // quedar en PENDING unos segundos) y crear el pedido en Sendura.
+  // El ref evita el doble procesamiento del StrictMode en desarrollo;
+  // este componente vive todo el ciclo de la app, así que el polling no
+  // necesita cancelación por desmontaje.
+  const wompiHandledRef = useRef(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('wompi_return') !== '1') return;
+    if (wompiHandledRef.current) return;
+    wompiHandledRef.current = true;
+
+    const transactionId = params.get('id');
+    const pending = readWompiPending();
+
+    // Limpiar la URL para que un refresh no repita el proceso
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (!transactionId || !pending?.order) return;
+
+    // pending.order.variant es la clave del catálogo ('ONE_TIME' | 'PLAN_2_MONTHS')
+    const pendingVariant = SHOPIFY_CONFIG.VARIANTS[pending.order.variant];
+    setRequest({
+      variantId: pendingVariant?.id || SHOPIFY_CONFIG.VARIANTS.ONE_TIME.id,
+      quantity: pending.order.quantity || 1,
+      options: pending.order.quizDiscount ? { quizDiscount: true } : {},
+    });
+    setQty(pending.order.quantity || 1);
+    setCityId(pending.order.cityId || null);
+    setCityLabel(pending.cityLabel || '');
+    setStep('confirming');
+
+    (async () => {
+      // Hasta ~2 minutos de polling (24 intentos x 5s) para pagos PSE lentos
+      for (let attempt = 0; attempt < 24; attempt++) {
+        const { ok, pending: stillPending, data } = await confirmWompiPayment({
+          transactionId,
+          reference: pending.reference,
+          order: pending.order,
+        });
+        if (ok) {
+          clearWompiPending();
+          setResult(data);
+          setStep('success');
+          trackPurchase({
+            contentId: pending.order.variant,
+            value: data.total,
+            currency: 'COP',
+            label: 'pago online (Wompi)',
+            orderId: data.orderNumber,
+          });
+          return;
+        }
+        if (!stillPending) {
+          clearWompiPending();
+          setServerError(data);
+          setStep('error');
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+      setServerError({
+        message: 'Tu pago sigue en proceso. Si se aprueba te contactaremos; también puedes escribirnos para confirmar tu pedido.',
+      });
+      setStep('error');
+    })();
+  }, []);
+
   const close = useCallback(() => {
-    // No permitir cerrar mientras se envía el pedido (evita dobles envíos
-    // por reintento del usuario sin saber si el primero entró).
-    setRequest((prev) => prev && step === 'sending' ? prev : null);
+    // No permitir cerrar mientras se envía el pedido o se verifica un pago
+    // (evita dobles envíos y pagos cobrados sin pedido registrado).
+    setRequest((prev) => prev && (step === 'sending' || step === 'confirming') ? prev : null);
   }, [step]);
 
   const { containerRef, initialFocusRef } = useModal(!!request, close);
@@ -148,7 +220,7 @@ export default function CheckoutFlow() {
     setFormError('');
     setStep('sending');
 
-    const { ok, data } = await submitLocalOrder({
+    const orderPayload = {
       variant: variantKey,
       cityId,
       quantity: qty,
@@ -159,7 +231,21 @@ export default function CheckoutFlow() {
       address: form.address,
       addressDetail: form.addressDetail,
       notes: form.notes,
-    });
+    };
+
+    if (payMethod === 'wompi') {
+      // Redirige al checkout seguro de Wompi; al volver, el efecto de
+      // wompi_return verifica el pago y crea el pedido en Sendura.
+      trackCTA('local_checkout_pay_online');
+      const { ok, data } = await startWompiPayment(orderPayload, { cityLabel });
+      if (!ok) {
+        setServerError({ ...data, fallbackToShopify: false });
+        setStep('error');
+      }
+      return;
+    }
+
+    const { ok, data } = await submitLocalOrder(orderPayload);
 
     if (ok) {
       setResult(data);
@@ -196,7 +282,7 @@ export default function CheckoutFlow() {
       >
         <div className="absolute inset-x-0 top-0 h-1.5 bg-curve-gradient" aria-hidden="true" />
 
-        {step !== 'sending' && (
+        {step !== 'sending' && step !== 'confirming' && (
           <button
             ref={initialFocusRef}
             type="button"
@@ -289,8 +375,17 @@ export default function CheckoutFlow() {
                 Datos de entrega en {cityLabel}
               </h2>
               <p className="text-xs text-gray-500 mb-4 flex items-center gap-1.5">
-                <Banknote className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />
-                Pago contra entrega — solo pagas cuando recibes tu CURVE.
+                {payMethod === 'wompi' ? (
+                  <>
+                    <CreditCard className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />
+                    Pago seguro con Wompi — Nequi, PSE o tarjeta.
+                  </>
+                ) : (
+                  <>
+                    <Banknote className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />
+                    Pago contra entrega — solo pagas cuando recibes tu CURVE.
+                  </>
+                )}
               </p>
 
               {/* Resumen del pedido */}
@@ -327,7 +422,7 @@ export default function CheckoutFlow() {
                 </div>
                 <div className="flex justify-between items-center border-t border-gray-100 mt-3 pt-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                    Total al recibir
+                    {payMethod === 'wompi' ? 'Total a pagar' : 'Total al recibir'}
                   </span>
                   <span className="font-black text-lg text-curveAction">${formatPrice(total)}</span>
                 </div>
@@ -379,6 +474,49 @@ export default function CheckoutFlow() {
                 />
               </div>
 
+              {/* Método de pago */}
+              <div className="mt-4" role="radiogroup" aria-label="Método de pago">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                  ¿Cómo quieres pagar?
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={payMethod === 'cod'}
+                    onClick={() => setPayMethod('cod')}
+                    className={`text-left rounded-xl border-2 transition-all px-3.5 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction ${
+                      payMethod === 'cod'
+                        ? 'border-curveAction bg-[#fff4f8]'
+                        : 'border-gray-100 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 font-bold text-sm text-gray-800">
+                      <Banknote className="w-4 h-4 text-green-600 shrink-0" aria-hidden="true" />
+                      Al recibir
+                    </span>
+                    <span className="text-[11px] text-gray-400 block mt-0.5">Efectivo contra entrega</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={payMethod === 'wompi'}
+                    onClick={() => setPayMethod('wompi')}
+                    className={`text-left rounded-xl border-2 transition-all px-3.5 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction ${
+                      payMethod === 'wompi'
+                        ? 'border-curveAction bg-[#fff4f8]'
+                        : 'border-gray-100 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 font-bold text-sm text-gray-800">
+                      <CreditCard className="w-4 h-4 text-curveAction shrink-0" aria-hidden="true" />
+                      Pagar ahora
+                    </span>
+                    <span className="text-[11px] text-gray-400 block mt-0.5">Nequi, PSE, tarjeta</span>
+                  </button>
+                </div>
+              </div>
+
               {formError && (
                 <p role="alert" className="mt-3 text-xs font-bold text-red-500 flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {formError}
@@ -389,7 +527,9 @@ export default function CheckoutFlow() {
                 type="submit"
                 className="mt-5 w-full bg-curveAction text-white font-black py-4 rounded-full shadow-premium hover:brightness-110 active:scale-[0.98] transition-all text-base flex justify-center items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-curveAction"
               >
-                Confirmar pedido — ${formatPrice(total)}
+                {payMethod === 'wompi'
+                  ? `Pagar ahora — $${formatPrice(total)}`
+                  : `Confirmar pedido — $${formatPrice(total)}`}
                 <ChevronRight className="w-5 h-5" aria-hidden="true" />
               </button>
 
@@ -407,8 +547,26 @@ export default function CheckoutFlow() {
           {step === 'sending' && (
             <div className="py-12 flex flex-col items-center text-center">
               <Loader2 className="w-10 h-10 text-curveAction animate-spin mb-4" aria-hidden="true" />
-              <h2 className="font-black text-lg text-textPrimary mb-1">Creando tu pedido…</h2>
-              <p className="text-sm text-gray-500">Estamos generando tu guía de envío.</p>
+              <h2 className="font-black text-lg text-textPrimary mb-1">
+                {payMethod === 'wompi' ? 'Abriendo el pago seguro…' : 'Creando tu pedido…'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {payMethod === 'wompi'
+                  ? 'Te llevamos al checkout de Wompi.'
+                  : 'Estamos generando tu guía de envío.'}
+              </p>
+            </div>
+          )}
+
+          {/* PASO 3b: VERIFICANDO PAGO (regreso de Wompi) */}
+          {step === 'confirming' && (
+            <div className="py-12 flex flex-col items-center text-center">
+              <Loader2 className="w-10 h-10 text-curveAction animate-spin mb-4" aria-hidden="true" />
+              <h2 className="font-black text-lg text-textPrimary mb-1">Verificando tu pago…</h2>
+              <p className="text-sm text-gray-500 max-w-xs">
+                Estamos confirmando con Wompi y registrando tu pedido.{' '}
+                <strong>No cierres esta ventana.</strong>
+              </p>
             </div>
           )}
 
@@ -420,9 +578,20 @@ export default function CheckoutFlow() {
               </div>
               <h2 className="text-2xl font-black text-textPrimary mb-2">¡Pedido confirmado! 🎉</h2>
               <p className="text-sm text-gray-600 mb-5">
-                Tu CURVE va en camino a <strong>{cityLabel}</strong>. Pagas{' '}
-                <strong className="text-curveAction">${formatPrice(result.total ?? total)}</strong>{' '}
-                al recibirlo.
+                {result.paid ? (
+                  <>
+                    Tu pago de{' '}
+                    <strong className="text-curveAction">${formatPrice(result.total ?? total)}</strong>{' '}
+                    fue aprobado ✔ Tu CURVE va en camino{cityLabel ? <> a <strong>{cityLabel}</strong></> : null} —
+                    no pagas nada al recibir.
+                  </>
+                ) : (
+                  <>
+                    Tu CURVE va en camino a <strong>{cityLabel}</strong>. Pagas{' '}
+                    <strong className="text-curveAction">${formatPrice(result.total ?? total)}</strong>{' '}
+                    al recibirlo.
+                  </>
+                )}
               </p>
 
               <div className="bg-background border border-gray-100 rounded-2xl p-4 text-left space-y-2 mb-5">
@@ -458,7 +627,9 @@ export default function CheckoutFlow() {
                 <AlertTriangle className="w-7 h-7 text-red-500" aria-hidden="true" />
               </div>
               <h2 className="text-xl font-black text-textPrimary mb-2">No pudimos crear el pedido</h2>
-              <p className="text-sm text-gray-600 mb-5">{serverError.message}</p>
+              <p className="text-sm text-gray-600 mb-5">
+                {serverError.message || 'Algo salió mal. Intenta de nuevo en un momento.'}
+              </p>
 
               <div className="space-y-2.5">
                 <button
