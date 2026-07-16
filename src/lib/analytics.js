@@ -125,6 +125,27 @@ export function trackInitiateCheckout({ contentId, value, currency = 'COP', labe
 }
 
 /**
+ * Compra confirmada (pedido contra-entrega creado en Sendura).
+ * Es el evento de mayor valor: conversión real, no solo intención.
+ */
+export function trackPurchase({ contentId, value, currency = 'COP', label, orderId } = {}) {
+  fbq('Purchase', {
+    content_ids: [contentId],
+    content_type: 'product',
+    content_name: label,
+    value,
+    currency,
+  });
+  gtag('purchase', {
+    transaction_id: orderId,
+    currency,
+    value,
+    items: [{ item_id: contentId, item_name: label, price: value }],
+  });
+  pushDataLayer({ event: 'purchase', content_id: contentId, value, currency, order_id: orderId });
+}
+
+/**
  * Lead capturado (quiz completado, exit intent capturado, etc.).
  */
 export function trackLead({ source, value = 0 } = {}) {

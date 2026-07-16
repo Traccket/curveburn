@@ -1,5 +1,6 @@
 import { X, ArrowRight } from 'lucide-react';
-import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
+import { SHOPIFY_CONFIG } from '../lib/shopify';
+import { beginCheckout } from '../lib/localCheckout';
 import { trackCTA, trackAddToCart } from '../lib/analytics';
 import { useModal } from '../hooks/useModal';
 
@@ -22,13 +23,13 @@ export default function UpsellModal({ isOpen, onClose }) {
       currency: 'COP',
       label: `${subVariant.label} (upsell)`,
     });
-    handleCheckout(subVariant.id, 1);
+    beginCheckout(subVariant.id, 1);
     onClose();
   };
 
   const declineUpsell = () => {
     trackCTA('upsell_decline');
-    handleCheckout(oneTime.id, 1);
+    beginCheckout(oneTime.id, 1);
     onClose();
   };
 

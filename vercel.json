@@ -74,6 +74,6 @@
     }
   ],
   "rewrites": [
-    { "source": "/((?!privacidad|terminos|devoluciones|robots\\.txt|sitemap\\.xml|assets/|.*\\.[^/]+$).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|privacidad|terminos|devoluciones|robots\\.txt|sitemap\\.xml|assets/|.*\\.[^/]+$).*)", "destination": "/index.html" }
   ]
 }

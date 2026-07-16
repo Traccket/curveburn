@@ -28,6 +28,33 @@ son HTML estático y **no** leen variables de entorno. Reemplazar ahí:
 `[EMAIL_SOPORTE]`, `[WHATSAPP]`, `[N° REGISTRO INVIMA]`.
 Son requisito legal (Ley 1581 Habeas Data + Ley 1480 Estatuto del Consumidor).
 
+## 2.5 Checkout contra-entrega (Sendura)
+
+Variables del **servidor** en Vercel (sin prefijo `VITE_`, marcar Production
+y Preview):
+
+| Variable | Qué es |
+|---|---|
+| `SENDURA_API_TOKEN` | Token de la tienda (panel Sendura → Tiendas/Shops). Token regenerado y validado OK el 2026-07-06. |
+| `SENDURA_SKU` | `134765` (confirmar que está activo en Inventarios de Sendura) |
+| `SENDURA_SKU_PLAN` | (Opcional) SKU del plan 2 meses si es distinto |
+
+Mientras falten, el checkout local muestra error con botón de respaldo
+"pagar online" (Shopify), así no se pierde ninguna venta.
+
+## 2.6 Pago online en el checkout propio (Wompi)
+
+Variables del **servidor** en Vercel (sin `VITE_`, Production y Preview):
+
+| Variable | Qué es |
+|---|---|
+| `WOMPI_PUBLIC_KEY` | Llave pública de producción (`pub_prod_...`) |
+| `WOMPI_INTEGRITY_SECRET` | "Secreto de integridad" — Wompi → Desarrolladores |
+
+La llave **privada** de Wompi NO se usa. Mientras falten estas variables,
+la opción "Pagar ahora" del checkout local muestra error y el cliente puede
+usar pago contra entrega.
+
 ## 3. Verificaciones en Shopify Admin
 
 - El código `QUIZ5OFF` (o el valor de `VITE_QUIZ_DISCOUNT_CODE`) debe existir

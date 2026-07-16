@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
+import { SHOPIFY_CONFIG } from '../lib/shopify';
+import { beginCheckout } from '../lib/localCheckout';
 import { trackLead, trackCTA } from '../lib/analytics';
 import { QUIZ_DISCOUNT_CODE } from '../config/business';
 import { useModal } from '../hooks/useModal';
@@ -143,12 +144,18 @@ export default function QuizModal({ isOpen, onClose }) {
     const variantId = SHOPIFY_CONFIG.SUBSCRIPTIONS_ENABLED
       ? SHOPIFY_CONFIG.VARIANTS.PLAN_2_MONTHS.id
       : SHOPIFY_CONFIG.VARIANTS.ONE_TIME.id;
-    handleCheckout(variantId, 1, {
+    beginCheckout(variantId, 1, {
+      // Para la ruta Shopify: código de descuento en la URL del checkout.
       discount: QUIZ_DISCOUNT_CODE,
+      // Para la ruta contra-entrega (Sendura): el 5% se aplica en el servidor.
+      quizDiscount: true,
       utmSource: 'quiz',
       utmMedium: 'onsite',
       utmCampaign: 'diagnostic',
     });
+    // Cerramos el quiz para que el modal de checkout quede al frente sin
+    // dos focus-traps compitiendo por el teclado.
+    onClose();
   };
 
   const diagnosticResult = getDiagnosticResult(answers);

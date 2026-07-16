@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
+import { SHOPIFY_CONFIG } from '../lib/shopify';
+import { beginCheckout } from '../lib/localCheckout';
 import { trackAddToCart } from '../lib/analytics';
 
 export default function StickyAddToCart() {
@@ -34,7 +35,7 @@ export default function StickyAddToCart() {
       currency: 'COP',
       label: `sticky_${variant.label}`,
     });
-    handleCheckout(variant.id, 1);
+    beginCheckout(variant.id, 1);
   };
 
   return (

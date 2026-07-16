@@ -14,6 +14,7 @@ import ExitIntentModal from './components/ExitIntentModal';
 import QuizModal from './components/QuizModal';
 import StickyAddToCart from './components/StickyAddToCart';
 import CookieBanner from './components/CookieBanner';
+import CheckoutFlow from './components/CheckoutFlow';
 
 function App() {
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -28,6 +29,8 @@ function App() {
       <ExitIntentModal />
       <QuizModal isOpen={isQuizOpen} onClose={() => setIsQuizOpen(false)} />
       <CookieBanner />
+      {/* Puerta de ciudad + checkout contra-entrega (Sendura) o Shopify */}
+      <CheckoutFlow />
 
       {/* Fondo decorativo */}
       <CurvePath />
