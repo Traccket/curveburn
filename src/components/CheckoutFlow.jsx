@@ -86,7 +86,8 @@ export default function CheckoutFlow() {
       setForm(EMPTY_FORM);
       setFormError('');
       setPayMethod('cod');
-      setPurchase('once');
+      // El hero puede preseleccionar la suscripción ("Suscribirme")
+      setPurchase(options?.preferSubscription ? 'sub' : 'once');
       setCard(EMPTY_CARD);
       setAcceptSub(false);
       setResult(null);
@@ -471,7 +472,9 @@ export default function CheckoutFlow() {
               {route === 'shopify' && (
                 <p className="mt-4 text-sm font-semibold text-curvePurple bg-curvePink/5 border border-curvePink/20 rounded-xl px-4 py-3 flex items-center gap-2">
                   <Truck className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  Llegamos con envío nacional — pago online seguro.
+                  {request.options.preferSubscription
+                    ? 'La suscripción aún no llega a tu zona, pero puedes comprar tu CURVE con envío nacional y pago online.'
+                    : 'Llegamos con envío nacional — pago online seguro.'}
                 </p>
               )}
 

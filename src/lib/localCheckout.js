@@ -213,12 +213,18 @@ export async function confirmWompiPayment({ transactionId, reference, order }) {
 /**
  * Config pública del checkout: llave pública de Wompi, host (sandbox/prod)
  * y datos del plan de suscripción. null si no se pudo cargar.
+ * Cacheada a nivel de módulo: el hero y el checkout comparten una sola
+ * petición; si falla, el siguiente llamado reintenta.
  */
+let _wompiCfgCache = null;
 export async function getWompiConfig() {
+  if (_wompiCfgCache) return _wompiCfgCache;
   try {
     const res = await fetch('/api/wompi-config');
     if (!res.ok) return null;
-    return await res.json();
+    const cfg = await res.json();
+    _wompiCfgCache = cfg;
+    return cfg;
   } catch {
     return null;
   }
