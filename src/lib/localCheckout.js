@@ -205,3 +205,78 @@ export async function confirmWompiPayment({ transactionId, reference, order }) {
   const { httpStatus, data } = await post('/api/wompi-confirm', { transactionId, reference, order });
   return { ok: httpStatus === 201, pending: httpStatus === 202, data };
 }
+
+// ============================================================
+// Suscripción mensual (cobro recurrente Sendura + Wompi)
+// ============================================================
+
+/**
+ * Config pública del checkout: llave pública de Wompi, host (sandbox/prod)
+ * y datos del plan de suscripción. null si no se pudo cargar.
+ * Cacheada a nivel de módulo: el hero y el checkout comparten una sola
+ * petición; si falla, el siguiente llamado reintenta.
+ */
+let _wompiCfgCache = null;
+export async function getWompiConfig() {
+  if (_wompiCfgCache) return _wompiCfgCache;
+  try {
+    const res = await fetch('/api/wompi-config');
+    if (!res.ok) return null;
+    const cfg = await res.json();
+    _wompiCfgCache = cfg;
+    return cfg;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Acceptance token de términos de Wompi (requerido para crear la fuente
+ * de pago). Se pide directo a Wompi con la llave pública.
+ */
+export async function getWompiAcceptance(cfg) {
+  try {
+    const res = await fetch(`${cfg.wompiBase}/v1/merchants/${cfg.publicKey}`);
+    const json = await res.json();
+    return json?.data?.presigned_acceptance?.acceptance_token || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tokeniza la tarjeta DIRECTAMENTE navegador → Wompi (llave pública).
+ * Los datos de la tarjeta nunca tocan nuestros servidores (PCI-DSS).
+ * Devuelve { ok, token } o { ok: false, message }.
+ */
+export async function tokenizeWompiCard(cfg, card) {
+  try {
+    const res = await fetch(`${cfg.wompiBase}/v1/tokens/cards`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.publicKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(card),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json?.status === 'CREATED' && json?.data?.id) {
+      return { ok: true, token: json.data.id };
+    }
+    const messages = json?.error?.messages
+      ? Object.values(json.error.messages).flat().join(' ')
+      : null;
+    return { ok: false, message: messages || 'No pudimos validar la tarjeta. Revisa los datos.' };
+  } catch {
+    return { ok: false, message: 'No pudimos conectar con la pasarela de pago. Revisa tu internet.' };
+  }
+}
+
+/**
+ * Crea la suscripción vía nuestra función serverless (que llama a Sendura).
+ * Devuelve { ok, pending, data }.
+ */
+export async function submitSubscription(payload) {
+  const { httpStatus, data } = await post('/api/subscriptions', payload);
+  return { ok: httpStatus === 201, pending: httpStatus === 202, data };
+}

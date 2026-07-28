@@ -32,6 +32,23 @@ export const CITIES = {
 export const QUIZ_DISCOUNT_RATE = 0.05;
 export const MAX_QTY = 5;
 
+/**
+ * Plan 2 Meses (cobro recurrente vía Sendura + Wompi).
+ * Son exactamente 2 ciclos: primer cobro al suscribirse y un segundo a los
+ * 30 días — después la suscripción TERMINA automáticamente (maxCycles).
+ * El precio es AUTORITATIVO aquí (env SENDURA_SUB_PRICE): el frontend lo
+ * lee de /api/wompi-config, así lo que se muestra y lo que se cobra
+ * siempre coinciden.
+ */
+export const SUBSCRIPTION_PLAN = {
+  planCode: 'CURVE-2MESES',
+  productName: CATALOG.ONE_TIME.name,
+  intervalDays: 30,
+  maxCycles: 2,
+  unitPrice: () => parseInt(process.env.SENDURA_SUB_PRICE || '99000', 10),
+  sku: () => process.env.SENDURA_SUB_SKU || process.env.SENDURA_SKU,
+};
+
 export function unitPriceFor(variant, quizDiscount) {
   return quizDiscount ? Math.round(variant.price * (1 - QUIZ_DISCOUNT_RATE)) : variant.price;
 }
