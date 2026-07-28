@@ -56,6 +56,10 @@ export default async function handler(req, res) {
     quantity,
     unit_price: unitPrice,
     interval_days: SUBSCRIPTION_PLAN.intervalDays,
+    // Plan finito: 2 cobros en total (hoy + día 30) y la suscripción termina.
+    // El backend de Sendura debe completar la suscripción al llegar a este
+    // número de cobros exitosos (ver spec sección "max_cycles").
+    max_cycles: SUBSCRIPTION_PLAN.maxCycles,
     customer_name: name,
     customer_email: email,
     customer_phone: phone,

@@ -57,7 +57,7 @@ export default function HeroSection() {
       contentId: oneTime.id,
       value: monthlySelected && subPlan ? subPlan.price : oneTime.price,
       currency: 'COP',
-      label: monthlySelected ? 'Suscripción mensual' : oneTime.label,
+      label: monthlySelected ? 'Plan 2 meses' : oneTime.label,
     });
     beginCheckout(
       oneTime.id,
@@ -187,7 +187,7 @@ export default function HeroSection() {
                     </span>
                     <span className="font-bold text-gray-800 flex items-center gap-1.5">
                       <RefreshCw className="w-4 h-4 text-curveAction shrink-0" aria-hidden="true" />
-                      Suscripción Mensual
+                      Plan 2 Meses
                     </span>
                   </div>
                   <span className="font-black text-lg text-curveAction">
@@ -198,7 +198,11 @@ export default function HeroSection() {
                 <div className="pl-8 space-y-2 opacity-90">
                   <p className="text-xs text-gray-600 flex items-center gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
-                    Tu CURVE cada 30 días sin hacer nada
+                    2 entregas: la primera hoy y la segunda a los 30 días
+                  </p>
+                  <p className="text-xs text-gray-600 flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
+                    Solo 2 pagos — el plan termina solo, sin cobros de por vida
                   </p>
                   <p className="text-xs text-gray-600 flex items-center gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />{' '}
@@ -223,11 +227,11 @@ export default function HeroSection() {
             className="w-full bg-curveAction text-white font-black py-4 rounded-full shadow-premium hover:brightness-110 active:scale-[0.98] transition-all text-lg flex justify-center items-center gap-3 mt-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-curveAction"
             aria-label={
               monthlySelected
-                ? `Suscribirme por $${priceMonthly} pesos al mes`
+                ? `Empezar mi Plan 2 Meses por $${priceMonthly} pesos al mes`
                 : `Añadir al carrito: ${oneTime.label} por $${priceOneTime} pesos`
             }
           >
-            {monthlySelected ? 'Suscribirme' : 'Añadir al carrito'}{' '}
+            {monthlySelected ? 'Empezar mi plan' : 'Añadir al carrito'}{' '}
             <span className="bg-white/20 px-3 py-1 rounded-full text-sm tracking-wide">
               {monthlySelected ? `$${priceMonthly}/mes` : `$${priceOneTime}`}
             </span>

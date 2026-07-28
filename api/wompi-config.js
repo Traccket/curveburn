@@ -26,6 +26,7 @@ export default function handler(req, res) {
           planCode: SUBSCRIPTION_PLAN.planCode,
           price: SUBSCRIPTION_PLAN.unitPrice(),
           intervalDays: SUBSCRIPTION_PLAN.intervalDays,
+          maxCycles: SUBSCRIPTION_PLAN.maxCycles,
         }
       : null,
   });

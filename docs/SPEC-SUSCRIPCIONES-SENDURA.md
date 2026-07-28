@@ -1,6 +1,9 @@
 # Especificación técnica: Módulo de suscripciones en Sendura (cobros recurrentes con Wompi)
 
-**Versión 1.0 — Julio 2026**
+**Versión 1.1 — Julio 2026**
+**Cambio v1.1 (URGENTE)**: planes FINITOS con `max_cycles` — ver sección 5.1.
+La tienda CURVE ya envía `max_cycles: 2` en el payload; sin este control el
+cron cobraría de por vida un plan que se vendió como "2 meses".
 **Para**: equipo de desarrollo de Sendura (sendura.edgasanc.com)
 **De**: tienda CURVE (curveburn.app)
 
@@ -178,6 +181,32 @@ eventos" de Wompi (SHA-256 de las propiedades firmadas — ver
 docs.wompi.co → Eventos). Útil para resolver transacciones `PENDING` sin polling.
 
 ---
+
+## 5.1 ⚠️ Planes finitos: `max_cycles` (NUEVO en v1.1)
+
+El plan de CURVE **no es indefinido**: son exactamente **2 cobros** (el
+inicial al suscribirse + 1 renovación a los 30 días) y la suscripción debe
+**terminar sola**.
+
+Cambios requeridos:
+
+1. **Tabla `subscriptions`**: nueva columna `max_cycles` (int, nullable —
+   `null` = indefinido) y opcionalmente `completed_at`. Nuevo valor de
+   `status`: `completed`.
+2. **`POST /api/v1/subscriptions`**: aceptar el campo opcional `max_cycles`
+   (int ≥ 1). La tienda CURVE ya lo envía con valor `2`. Si no viene,
+   comportamiento actual (indefinido).
+3. **Al aprobar un cobro** (incluido el primero): contar los charges
+   `approved` de la suscripción; si `count >= max_cycles`, marcar
+   `status = 'completed'` y NO programar `next_charge_at`. Con `max_cycles=2`:
+   el cobro inicial es el 1/2, la renovación del día 30 es el 2/2 y ahí
+   termina.
+4. **Cron**: excluir suscripciones `completed` (igual que `cancelled`).
+5. **Respuesta de creación**: incluir `max_cycles` y opcionalmente
+   `charges_done` para que la tienda muestre "cobro 1 de 2".
+6. **QA**: crear con `max_cycles=2` → tras la renovación del día 30 la
+   suscripción queda `completed` y el cron nunca más la cobra; correr el
+   cron de nuevo no genera un tercer cobro.
 
 ## 5. Cron de cobros (diario, ej. 6:00 AM)
 

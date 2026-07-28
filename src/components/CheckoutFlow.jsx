@@ -499,7 +499,7 @@ export default function CheckoutFlow() {
                 {isSub ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />
-                    Recibe tu CURVE cada 30 días — cancela cuando quieras.
+                    Plan 2 Meses: entrega hoy y otra a los 30 días — luego termina solo.
                   </>
                 ) : payMethod === 'wompi' ? (
                   <>
@@ -550,10 +550,10 @@ export default function CheckoutFlow() {
                       </span>
                       <span className="font-bold text-sm text-gray-800 flex items-center gap-1">
                         <RefreshCw className="w-3.5 h-3.5 text-curveAction shrink-0" aria-hidden="true" />
-                        Suscripción
+                        Plan 2 Meses
                       </span>
                       <span className="text-[11px] text-gray-400 block mt-0.5">
-                        ${formatPrice(subUnit)}/mes · cancela cuando quieras
+                        2 pagos de ${formatPrice(subUnit)} · termina solo
                       </span>
                     </button>
                   </div>
@@ -565,10 +565,10 @@ export default function CheckoutFlow() {
                 <div className="flex justify-between items-center gap-3">
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-textPrimary truncate">
-                      {isSub ? 'Suscripción mensual CURVE' : variant.label}
+                      {isSub ? 'Plan 2 Meses CURVE' : variant.label}
                     </p>
                     <p className="text-xs text-gray-400">
-                      ${formatPrice(displayUnit)} c/u{isSub && ' · cada 30 días'}
+                      ${formatPrice(displayUnit)} c/u{isSub && ' · hoy y a los 30 días'}
                       {!isSub && hasQuizDiscount && (
                         <span className="ml-1 text-green-600 font-bold">· 5% quiz aplicado</span>
                       )}
@@ -710,10 +710,12 @@ export default function CheckoutFlow() {
                       className="mt-0.5 w-4 h-4 rounded accent-curveAction shrink-0"
                     />
                     <span>
-                      Autorizo el cobro automático de{' '}
-                      <strong className="text-textPrimary">${formatPrice(displayTotal)}</strong> cada
-                      30 días a esta tarjeta, procesado de forma segura por Wompi. Puedo cancelar en
-                      cualquier momento con el enlace que recibiré al suscribirme.
+                      Autorizo <strong className="text-textPrimary">2 cobros</strong> de{' '}
+                      <strong className="text-textPrimary">${formatPrice(displayTotal)}</strong> a
+                      esta tarjeta: uno hoy y otro a los 30 días, procesados de forma segura por
+                      Wompi. Después del segundo cobro el plan{' '}
+                      <strong className="text-textPrimary">termina automáticamente</strong>. Puedo
+                      cancelar antes con el enlace que recibiré al suscribirme.
                     </span>
                   </label>
 
@@ -780,7 +782,7 @@ export default function CheckoutFlow() {
                 className="mt-5 w-full bg-curveAction text-white font-black py-4 rounded-full shadow-premium hover:brightness-110 active:scale-[0.98] transition-all text-base flex justify-center items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-curveAction"
               >
                 {isSub
-                  ? `Suscribirme — $${formatPrice(displayTotal)}/mes`
+                  ? `Empezar mi plan — $${formatPrice(displayTotal)}/mes`
                   : payMethod === 'wompi'
                     ? `Pagar ahora — $${formatPrice(total)}`
                     : `Confirmar pedido — $${formatPrice(total)}`}
@@ -844,7 +846,7 @@ export default function CheckoutFlow() {
                 {result.pendingPayment
                   ? 'Tu pago está en validación ⏳'
                   : result.subscription
-                    ? '¡Suscripción activa! 🎉'
+                    ? '¡Plan 2 Meses activo! 🎉'
                     : '¡Pedido confirmado! 🎉'}
               </h2>
               <p className="text-sm text-gray-600 mb-5">
@@ -859,8 +861,9 @@ export default function CheckoutFlow() {
                   <>
                     Tu primer pago de{' '}
                     <strong className="text-curveAction">${formatPrice(result.total ?? displayTotal)}</strong>{' '}
-                    fue aprobado ✔ Tu CURVE va en camino{cityLabel ? <> a <strong>{cityLabel}</strong></> : null} y
-                    lo recibirás cada 30 días sin hacer nada.
+                    fue aprobado ✔ Tu CURVE va en camino{cityLabel ? <> a <strong>{cityLabel}</strong></> : null}.
+                    En 30 días se hará el <strong>segundo y último cobro</strong> con tu segunda
+                    entrega, y el plan termina solo.
                   </>
                 ) : result.paid ? (
                   <>
@@ -899,7 +902,7 @@ export default function CheckoutFlow() {
                 )}
                 {result.nextChargeAt && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Próximo cobro</span>
+                    <span className="text-gray-400">Segundo y último cobro</span>
                     <span className="font-bold text-textPrimary">{result.nextChargeAt}</span>
                   </div>
                 )}
