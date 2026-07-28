@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   X, MapPin, Truck, Banknote, CheckCircle2, ChevronRight, Loader2, AlertTriangle,
-  Minus, Plus, CreditCard,
+  Minus, Plus, CreditCard, RefreshCw, Clock,
 } from 'lucide-react';
 import { handleCheckout, SHOPIFY_CONFIG } from '../lib/shopify';
 import {
   BEGIN_CHECKOUT_EVENT, DEPARTMENTS, submitLocalOrder,
   startWompiPayment, readWompiPending, clearWompiPending, confirmWompiPayment,
+  getWompiConfig, getWompiAcceptance, tokenizeWompiCard, submitSubscription,
 } from '../lib/localCheckout';
 import { trackCTA, trackInitiateCheckout, trackPurchase } from '../lib/analytics';
 import { useModal } from '../hooks/useModal';
@@ -20,6 +21,15 @@ const EMPTY_FORM = {
   address: '',
   addressDetail: '',
   notes: '',
+};
+
+const EMPTY_CARD = { number: '', exp: '', cvc: '', holder: '' };
+
+// Formateo visual de los campos de tarjeta
+const formatCardNumber = (v) => v.replace(/\D/g, '').slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ');
+const formatExp = (v) => {
+  const d = v.replace(/\D/g, '').slice(0, 4);
+  return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
 };
 
 function findVariant(variantId) {
@@ -48,8 +58,20 @@ export default function CheckoutFlow() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [payMethod, setPayMethod] = useState('cod'); // cod (contra entrega) | wompi (online)
-  const [result, setResult] = useState(null); // { orderNumber, guia, total, paid }
+  const [purchase, setPurchase] = useState('once'); // once (compra única) | sub (suscripción mensual)
+  const [card, setCard] = useState(EMPTY_CARD);
+  const [acceptSub, setAcceptSub] = useState(false);
+  const [wompiCfg, setWompiCfg] = useState(null); // /api/wompi-config (plan + llave pública)
+  const [result, setResult] = useState(null); // { orderNumber, guia, total, paid, subscription?, pendingPayment? }
   const [serverError, setServerError] = useState(null); // { message, fallbackToShopify }
+
+  // Config pública (llave Wompi + precio del plan) — una sola vez
+  const cfgFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!request || cfgFetchedRef.current) return;
+    cfgFetchedRef.current = true;
+    getWompiConfig().then(setWompiCfg);
+  }, [request]);
 
   useEffect(() => {
     const onBegin = (e) => {
@@ -64,6 +86,9 @@ export default function CheckoutFlow() {
       setForm(EMPTY_FORM);
       setFormError('');
       setPayMethod('cod');
+      setPurchase('once');
+      setCard(EMPTY_CARD);
+      setAcceptSub(false);
       setResult(null);
       setServerError(null);
     };
@@ -156,6 +181,14 @@ export default function CheckoutFlow() {
   const unitPrice = hasQuizDiscount ? Math.round(variant.price * 0.95) : variant.price;
   const total = unitPrice * qty;
 
+  // Suscripción: disponible solo si el backend la reporta configurada
+  const subPlan = wompiCfg?.subscription || null;
+  const subAvailable = !!(subPlan && wompiCfg?.publicKey);
+  const isSub = purchase === 'sub' && subAvailable;
+  const subUnit = subPlan?.price || 0;
+  const displayUnit = isSub ? subUnit : unitPrice;
+  const displayTotal = displayUnit * qty;
+
   const goToShopify = (source) => {
     trackCTA(`checkout_gate_shopify_${source}`);
     setRequest(null);
@@ -204,10 +237,89 @@ export default function CheckoutFlow() {
     if (form.customerName.trim().length < 3) return 'Escribe tu nombre completo.';
     if (!/^3\d{9}$/.test(form.customerPhone.replace(/\D/g, '')))
       return 'El celular debe tener 10 dígitos y empezar por 3.';
+    if (isSub && !form.customerEmail.trim())
+      return 'El correo es obligatorio para la suscripción (ahí te avisamos cada cobro).';
     if (form.customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.customerEmail.trim()))
       return 'El correo no es válido.';
     if (form.address.trim().length < 5) return 'Escribe la dirección completa de entrega.';
+
+    if (isSub) {
+      const digits = card.number.replace(/\D/g, '');
+      if (digits.length < 13 || digits.length > 19) return 'El número de tarjeta no es válido.';
+      const [mm, yy] = card.exp.split('/');
+      const month = parseInt(mm, 10);
+      const year = 2000 + parseInt(yy, 10);
+      const now = new Date();
+      if (!mm || !yy || month < 1 || month > 12 || Number.isNaN(year))
+        return 'La fecha de vencimiento debe ser MM/AA.';
+      if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1))
+        return 'La tarjeta está vencida.';
+      if (!/^\d{3,4}$/.test(card.cvc)) return 'El código de seguridad (CVC) no es válido.';
+      if (card.holder.trim().length < 3) return 'Escribe el nombre como aparece en la tarjeta.';
+      if (!acceptSub) return 'Debes autorizar el cobro automático mensual para suscribirte.';
+    }
     return '';
+  };
+
+  const submitSub = async () => {
+    trackCTA('local_checkout_subscribe');
+    setStep('sending');
+
+    const cfg = wompiCfg || (await getWompiConfig());
+    if (!cfg?.publicKey) {
+      setServerError({ message: 'Las suscripciones no están disponibles en este momento.' });
+      setStep('error');
+      return;
+    }
+
+    const acceptance = await getWompiAcceptance(cfg);
+    if (!acceptance) {
+      setServerError({ message: 'No pudimos conectar con la pasarela de pago. Intenta de nuevo.' });
+      setStep('error');
+      return;
+    }
+
+    const [mm, yy] = card.exp.split('/');
+    const tokenized = await tokenizeWompiCard(cfg, {
+      number: card.number.replace(/\D/g, ''),
+      cvc: card.cvc,
+      exp_month: mm,
+      exp_year: yy,
+      card_holder: card.holder.trim(),
+    });
+    if (!tokenized.ok) {
+      setServerError({ message: tokenized.message });
+      setStep('error');
+      return;
+    }
+
+    const { ok, pending, data } = await submitSubscription({
+      cityId,
+      quantity: qty,
+      customerName: form.customerName,
+      customerPhone: form.customerPhone,
+      customerEmail: form.customerEmail,
+      address: form.address,
+      addressDetail: form.addressDetail,
+      wompi: { card_token: tokenized.token, acceptance_token: acceptance },
+    });
+
+    if (ok || pending) {
+      setResult({ ...data, pendingPayment: pending });
+      setStep('success');
+      if (ok) {
+        trackPurchase({
+          contentId: variant.id,
+          value: data.total ?? displayTotal,
+          currency: 'COP',
+          label: 'suscripción mensual (Wompi)',
+          orderId: data.orderNumber,
+        });
+      }
+    } else {
+      setServerError(data);
+      setStep('error');
+    }
   };
 
   const submit = async (e) => {
@@ -218,6 +330,12 @@ export default function CheckoutFlow() {
       return;
     }
     setFormError('');
+
+    if (isSub) {
+      await submitSub();
+      return;
+    }
+
     setStep('sending');
 
     const orderPayload = {
@@ -375,7 +493,12 @@ export default function CheckoutFlow() {
                 Datos de entrega en {cityLabel}
               </h2>
               <p className="text-xs text-gray-500 mb-4 flex items-center gap-1.5">
-                {payMethod === 'wompi' ? (
+                {isSub ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />
+                    Recibe tu CURVE cada 30 días — cancela cuando quieras.
+                  </>
+                ) : payMethod === 'wompi' ? (
                   <>
                     <CreditCard className="w-3.5 h-3.5 text-curveAction" aria-hidden="true" />
                     Pago seguro con Wompi — Nequi, PSE o tarjeta.
@@ -388,14 +511,62 @@ export default function CheckoutFlow() {
                 )}
               </p>
 
+              {/* Tipo de compra: única vs suscripción (si el plan está configurado) */}
+              {subAvailable && (
+                <div className="mb-4" role="radiogroup" aria-label="Tipo de compra">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={purchase === 'once'}
+                      onClick={() => setPurchase('once')}
+                      className={`text-left rounded-xl border-2 transition-all px-3.5 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction ${
+                        purchase === 'once'
+                          ? 'border-curveAction bg-[#fff4f8]'
+                          : 'border-gray-100 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="font-bold text-sm text-gray-800 block">Compra única</span>
+                      <span className="text-[11px] text-gray-400 block mt-0.5">
+                        ${formatPrice(unitPrice)}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={purchase === 'sub'}
+                      onClick={() => setPurchase('sub')}
+                      className={`relative text-left rounded-xl border-2 transition-all px-3.5 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-curveAction ${
+                        purchase === 'sub'
+                          ? 'border-curveAction bg-[#fff4f8]'
+                          : 'border-gray-100 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="absolute -top-2 right-2 bg-curveAction text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Ahorra {Math.round((1 - subUnit / variant.price) * 100)}%
+                      </span>
+                      <span className="font-bold text-sm text-gray-800 flex items-center gap-1">
+                        <RefreshCw className="w-3.5 h-3.5 text-curveAction shrink-0" aria-hidden="true" />
+                        Suscripción
+                      </span>
+                      <span className="text-[11px] text-gray-400 block mt-0.5">
+                        ${formatPrice(subUnit)}/mes · cancela cuando quieras
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Resumen del pedido */}
               <div className="bg-background border border-gray-100 rounded-2xl p-4 mb-4">
                 <div className="flex justify-between items-center gap-3">
                   <div className="min-w-0">
-                    <p className="font-bold text-sm text-textPrimary truncate">{variant.label}</p>
+                    <p className="font-bold text-sm text-textPrimary truncate">
+                      {isSub ? 'Suscripción mensual CURVE' : variant.label}
+                    </p>
                     <p className="text-xs text-gray-400">
-                      ${formatPrice(unitPrice)} c/u
-                      {hasQuizDiscount && (
+                      ${formatPrice(displayUnit)} c/u{isSub && ' · cada 30 días'}
+                      {!isSub && hasQuizDiscount && (
                         <span className="ml-1 text-green-600 font-bold">· 5% quiz aplicado</span>
                       )}
                     </p>
@@ -422,9 +593,11 @@ export default function CheckoutFlow() {
                 </div>
                 <div className="flex justify-between items-center border-t border-gray-100 mt-3 pt-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                    {payMethod === 'wompi' ? 'Total a pagar' : 'Total al recibir'}
+                    {isSub ? 'Total mensual' : payMethod === 'wompi' ? 'Total a pagar' : 'Total al recibir'}
                   </span>
-                  <span className="font-black text-lg text-curveAction">${formatPrice(total)}</span>
+                  <span className="font-black text-lg text-curveAction">
+                    ${formatPrice(displayTotal)}{isSub && <span className="text-xs font-bold">/mes</span>}
+                  </span>
                 </div>
               </div>
 
@@ -468,13 +641,88 @@ export default function CheckoutFlow() {
                   type="email"
                   value={form.customerEmail}
                   onChange={setField('customerEmail')}
-                  placeholder="Correo (opcional)"
+                  placeholder={isSub ? 'Correo *' : 'Correo (opcional)'}
                   autoComplete="email"
+                  required={isSub}
                   className="w-full rounded-xl border-2 border-gray-100 px-4 py-3 text-sm focus:outline-none focus:border-curveAction transition-colors"
                 />
               </div>
 
-              {/* Método de pago */}
+              {/* Suscripción: datos de la tarjeta (tokenización directa con Wompi) */}
+              {isSub && (
+                <div className="mt-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5" aria-hidden="true" />
+                    Tarjeta débito o crédito
+                  </p>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={card.number}
+                      onChange={(e) => setCard((c) => ({ ...c, number: formatCardNumber(e.target.value) }))}
+                      placeholder="Número de tarjeta *"
+                      autoComplete="cc-number"
+                      inputMode="numeric"
+                      required
+                      className="w-full rounded-xl border-2 border-gray-100 px-4 py-3 text-sm font-mono focus:outline-none focus:border-curveAction transition-colors"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={card.exp}
+                        onChange={(e) => setCard((c) => ({ ...c, exp: formatExp(e.target.value) }))}
+                        placeholder="MM/AA *"
+                        autoComplete="cc-exp"
+                        inputMode="numeric"
+                        required
+                        className="w-full rounded-xl border-2 border-gray-100 px-4 py-3 text-sm font-mono focus:outline-none focus:border-curveAction transition-colors"
+                      />
+                      <input
+                        type="text"
+                        value={card.cvc}
+                        onChange={(e) => setCard((c) => ({ ...c, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                        placeholder="CVC *"
+                        autoComplete="cc-csc"
+                        inputMode="numeric"
+                        required
+                        className="w-full rounded-xl border-2 border-gray-100 px-4 py-3 text-sm font-mono focus:outline-none focus:border-curveAction transition-colors"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={card.holder}
+                      onChange={(e) => setCard((c) => ({ ...c, holder: e.target.value }))}
+                      placeholder="Nombre en la tarjeta *"
+                      autoComplete="cc-name"
+                      required
+                      className="w-full rounded-xl border-2 border-gray-100 px-4 py-3 text-sm focus:outline-none focus:border-curveAction transition-colors"
+                    />
+                  </div>
+
+                  <label className="mt-3 flex items-start gap-2.5 text-xs text-gray-500 leading-relaxed cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptSub}
+                      onChange={(e) => setAcceptSub(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded accent-curveAction shrink-0"
+                    />
+                    <span>
+                      Autorizo el cobro automático de{' '}
+                      <strong className="text-textPrimary">${formatPrice(displayTotal)}</strong> cada
+                      30 días a esta tarjeta, procesado de forma segura por Wompi. Puedo cancelar en
+                      cualquier momento con el enlace que recibiré al suscribirme.
+                    </span>
+                  </label>
+
+                  <p className="mt-2 text-[11px] text-gray-400 flex items-center gap-1">
+                    🔒 Los datos de tu tarjeta van cifrados directamente a Wompi (Bancolombia) —
+                    nunca los vemos ni los guardamos.
+                  </p>
+                </div>
+              )}
+
+              {/* Método de pago (solo compra única) */}
+              {!isSub && (
               <div className="mt-4" role="radiogroup" aria-label="Método de pago">
                 <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
                   ¿Cómo quieres pagar?
@@ -516,6 +764,7 @@ export default function CheckoutFlow() {
                   </button>
                 </div>
               </div>
+              )}
 
               {formError && (
                 <p role="alert" className="mt-3 text-xs font-bold text-red-500 flex items-center gap-1.5">
@@ -527,9 +776,11 @@ export default function CheckoutFlow() {
                 type="submit"
                 className="mt-5 w-full bg-curveAction text-white font-black py-4 rounded-full shadow-premium hover:brightness-110 active:scale-[0.98] transition-all text-base flex justify-center items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-curveAction"
               >
-                {payMethod === 'wompi'
-                  ? `Pagar ahora — $${formatPrice(total)}`
-                  : `Confirmar pedido — $${formatPrice(total)}`}
+                {isSub
+                  ? `Suscribirme — $${formatPrice(displayTotal)}/mes`
+                  : payMethod === 'wompi'
+                    ? `Pagar ahora — $${formatPrice(total)}`
+                    : `Confirmar pedido — $${formatPrice(total)}`}
                 <ChevronRight className="w-5 h-5" aria-hidden="true" />
               </button>
 
@@ -548,12 +799,16 @@ export default function CheckoutFlow() {
             <div className="py-12 flex flex-col items-center text-center">
               <Loader2 className="w-10 h-10 text-curveAction animate-spin mb-4" aria-hidden="true" />
               <h2 className="font-black text-lg text-textPrimary mb-1">
-                {payMethod === 'wompi' ? 'Abriendo el pago seguro…' : 'Creando tu pedido…'}
+                {isSub
+                  ? 'Procesando tu suscripción…'
+                  : payMethod === 'wompi' ? 'Abriendo el pago seguro…' : 'Creando tu pedido…'}
               </h2>
               <p className="text-sm text-gray-500">
-                {payMethod === 'wompi'
-                  ? 'Te llevamos al checkout de Wompi.'
-                  : 'Estamos generando tu guía de envío.'}
+                {isSub
+                  ? 'Validando tu tarjeta con Wompi y creando tu primer pedido. No cierres esta ventana.'
+                  : payMethod === 'wompi'
+                    ? 'Te llevamos al checkout de Wompi.'
+                    : 'Estamos generando tu guía de envío.'}
               </p>
             </div>
           )}
@@ -573,12 +828,38 @@ export default function CheckoutFlow() {
           {/* PASO 4: ÉXITO */}
           {step === 'success' && result && (
             <div className="py-4 text-center">
-              <div className="mx-auto w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4">
-                <CheckCircle2 className="w-9 h-9 text-green-600" aria-hidden="true" />
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                result.pendingPayment ? 'bg-amber-50' : 'bg-green-50'
+              }`}>
+                {result.pendingPayment ? (
+                  <Clock className="w-9 h-9 text-amber-500" aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 className="w-9 h-9 text-green-600" aria-hidden="true" />
+                )}
               </div>
-              <h2 className="text-2xl font-black text-textPrimary mb-2">¡Pedido confirmado! 🎉</h2>
+              <h2 className="text-2xl font-black text-textPrimary mb-2">
+                {result.pendingPayment
+                  ? 'Tu pago está en validación ⏳'
+                  : result.subscription
+                    ? '¡Suscripción activa! 🎉'
+                    : '¡Pedido confirmado! 🎉'}
+              </h2>
               <p className="text-sm text-gray-600 mb-5">
-                {result.paid ? (
+                {result.pendingPayment ? (
+                  <>
+                    Tu banco está validando el pago de{' '}
+                    <strong className="text-curveAction">${formatPrice(result.total ?? displayTotal)}</strong>.
+                    En cuanto se apruebe crearemos tu pedido automáticamente y te avisaremos al correo
+                    que dejaste. No necesitas hacer nada más.
+                  </>
+                ) : result.subscription ? (
+                  <>
+                    Tu primer pago de{' '}
+                    <strong className="text-curveAction">${formatPrice(result.total ?? displayTotal)}</strong>{' '}
+                    fue aprobado ✔ Tu CURVE va en camino{cityLabel ? <> a <strong>{cityLabel}</strong></> : null} y
+                    lo recibirás cada 30 días sin hacer nada.
+                  </>
+                ) : result.paid ? (
                   <>
                     Tu pago de{' '}
                     <strong className="text-curveAction">${formatPrice(result.total ?? total)}</strong>{' '}
@@ -595,20 +876,51 @@ export default function CheckoutFlow() {
               </p>
 
               <div className="bg-background border border-gray-100 rounded-2xl p-4 text-left space-y-2 mb-5">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">N° de pedido</span>
-                  <span className="font-mono font-bold text-textPrimary">{result.orderNumber}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Guía de envío</span>
-                  <span className="font-mono font-bold text-textPrimary">{result.guia}</span>
-                </div>
+                {result.orderNumber && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">N° de pedido</span>
+                    <span className="font-mono font-bold text-textPrimary">{result.orderNumber}</span>
+                  </div>
+                )}
+                {result.guia && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Guía de envío</span>
+                    <span className="font-mono font-bold text-textPrimary">{result.guia}</span>
+                  </div>
+                )}
+                {result.subscriptionId && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">N° de suscripción</span>
+                    <span className="font-mono font-bold text-textPrimary">#{result.subscriptionId}</span>
+                  </div>
+                )}
+                {result.nextChargeAt && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Próximo cobro</span>
+                    <span className="font-bold text-textPrimary">{result.nextChargeAt}</span>
+                  </div>
+                )}
               </div>
 
-              <p className="text-xs text-gray-400 mb-5 flex items-center justify-center gap-1.5">
+              <p className="text-xs text-gray-400 mb-2 flex items-center justify-center gap-1.5">
                 <Truck className="w-3.5 h-3.5" aria-hidden="true" />
                 Te contactaremos al celular que dejaste para coordinar la entrega.
               </p>
+
+              {result.cancelUrl && (
+                <p className="text-[11px] text-gray-400 mb-5">
+                  Puedes cancelar tu suscripción cuando quieras desde{' '}
+                  <a
+                    href={result.cancelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-curveAction"
+                  >
+                    este enlace
+                  </a>{' '}
+                  — guárdalo.
+                </p>
+              )}
 
               <button
                 type="button"
