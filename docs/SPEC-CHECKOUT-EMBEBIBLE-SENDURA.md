@@ -98,7 +98,8 @@ se pueda exponer sin riesgo:
 | `wompi_events_secret` | **cifrado** — validar webhook |
 | `subscriptions_enabled` | bool |
 | `fallback_url` | URL a la que enviar clientes FUERA de cobertura (ej. su Shopify). Nullable → mensaje "aún no llegamos a tu zona" |
-| `success_message`, `whatsapp` | opcionales para la pantalla final |
+| `success_message` | opcional para la pantalla final |
+| `whatsapp` | número de soporte de la tienda (solo dígitos) — ver sección 11 |
 | `default_fulfillment` | `warehouse` \| `pickup` — modo por defecto de los productos |
 | `pickup_address_1`, `pickup_address_2` | dirección de recogida (requerida si usa pickup) |
 | `pickup_city`, `pickup_province` | deben estar dentro de la cobertura de Sendura |
@@ -253,6 +254,46 @@ theme.liquid) y marcar el botón de compra existente con `data-sendura-sku` —
 el botón queda "inteligente": zonas con cobertura van a Sendura y el resto
 sigue al checkout normal de Shopify, sin duplicar botones ni romper nada.
 
+Además, en la lista de productos del panel, cada producto lleva un botón
+**"Copiar enlace de venta"** (`/checkout/{token}?sku={key}`) pensado para
+pegarlo en chats de WhatsApp, catálogo de WhatsApp Business, historias y bio de
+Instagram — el canal principal de muchas tiendas (ver sección 11).
+
+---
+
+## 11. WhatsApp — canal de venta, soporte y notificaciones
+
+### 11.1 Vender por WhatsApp (Fase 1 — sale gratis con el enlace hosteado)
+
+Muchas tiendas venden por chat sin página web. Su flujo con Sendura Checkout:
+responden al cliente con el **enlace del producto** (botón "Copiar enlace de
+venta" del panel) → el cliente lo abre en su celular, llena datos en 1 minuto y
+elige contra entrega o pago online → el pedido cae al panel con guía, sin
+digitación manual. El checkout hosteado debe ser **impecable en móvil** (este
+canal es ~100% celular) y tener metadatos Open Graph (foto y nombre del
+producto + logo de la tienda) para que el enlace se vea bien como preview en
+WhatsApp e Instagram.
+
+### 11.2 Botón de soporte en la confirmación (Fase 1 — campo `whatsapp`)
+
+Si la tienda configuró su número, la pantalla de éxito muestra
+"¿Dudas con tu pedido? Escríbenos" →
+`https://wa.me/57{whatsapp}?text=Hola!%20Consulta%20sobre%20mi%20pedido%20{order_number}`
+— el mensaje llega pre-escrito con el número de pedido (menos fricción de
+soporte para la tienda, menos ansiedad para el cliente).
+
+### 11.3 Notificaciones automáticas por WhatsApp (Fase 3 — diferencial killer)
+
+Sendura escribe automáticamente al cliente final en los hitos del pedido:
+"pedido confirmado 🎉 (guía X)", "tu paquete sale hoy", "tu mensajero está
+cerca", y para suscripciones "mañana se realiza tu cobro/entrega mensual".
+Requiere **WhatsApp Business API** (Meta) — número verificado, plantillas
+aprobadas y costo por conversación — por eso es Fase 3. Diseño sugerido:
+tabla `notification_templates` por evento, envío desde los mismos jobs que hoy
+cambian estados de pedido, y toggle por tienda (con su propio remitente o el
+número de Sendura como servicio). Es el argumento comercial más fuerte frente a
+transportadoras tradicionales: "Sendura avisa solo a tus clientes".
+
 ---
 
 ## 8. Webhook multi-tienda
@@ -285,9 +326,9 @@ correcta:
 
 | Fase | Alcance | Resultado |
 |---|---|---|
-| **1** | Modelo de datos + endpoints públicos + checkout hosteado (enlace directo) + panel básico | Cualquier tienda vende con un link |
+| **1** | Modelo de datos + endpoints públicos + checkout hosteado (enlace directo, móvil-primero, con OG preview) + panel básico + botón "Copiar enlace de venta" + WhatsApp de soporte en confirmación | Cualquier tienda vende con un link (incluido WhatsApp/Instagram) |
 | **2** | widget.js embebible + branding + validador de llaves Wompi + guías por plataforma | Integración "pegar 2 líneas" |
-| **3** | (Futuro) App de Shopify oficial, carrito multi-producto en un solo pedido, métricas de conversión del checkout, Nequi tokenizado en suscripciones | Escala |
+| **3** | (Futuro) Notificaciones automáticas por WhatsApp Business API, app de Shopify oficial, carrito multi-producto, métricas de conversión, Nequi tokenizado en suscripciones | Escala y diferencial |
 
 La fase 1 reutiliza casi todo lo que ya existe (orders, subscriptions,
 max_cycles, webhook) — el trabajo nuevo grande es el panel de configuración y
