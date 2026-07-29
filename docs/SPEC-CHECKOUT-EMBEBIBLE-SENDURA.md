@@ -186,6 +186,28 @@ Igual al endpoint de suscripciones actual, pero resolviendo plan/precio de
   `[data-sendura-sku]` / `[data-sendura-plan]` y abre la página hosteada en un
   iframe modal (con postMessage para cerrar/altura). El enlace directo es el
   fallback universal.
+
+**Comportamiento clave del widget — "botón inteligente" (requisito de negocio):**
+el widget se instala SOBRE el botón de compra que la tienda ya tiene (ej. el
+"Add to cart"/"Comprar" de Shopify) y decide según la ubicación del cliente:
+
+1. Click en el botón → el widget **intercepta** (`preventDefault`) y muestra la
+   puerta de ubicación (departamento → ciudad) en el modal.
+2. **Ciudad CON cobertura Sendura** → continúa en nuestro checkout (contra
+   entrega / online / suscripción) y el pedido cae a Sendura.
+3. **Ciudad SIN cobertura** → el widget cierra el modal y **deja que el botón
+   original siga su curso normal**: re-dispara la acción interceptada (submit
+   del form de "add to cart" de Shopify, o el `href` original del botón). El
+   cliente paga por el checkout de siempre de la tienda (Shopify u otro) y ese
+   pedido NO pasa por Sendura.
+4. La ciudad elegida se recuerda (localStorage) para no volver a preguntar en
+   la misma visita; con un enlace "cambiar ciudad" dentro del modal.
+
+`fallback_url` pasa a ser un **override opcional** (para tiendas que prefieren
+mandar fuera-de-cobertura a una URL específica). Si está vacío, el default del
+widget es "continuar con el flujo original del botón". En el checkout hosteado
+por enlace directo (sin widget, ej. link de Instagram) no hay "flujo original",
+así que ahí aplica `fallback_url` o el mensaje amable.
 - La tienda CURVE puede migrar a este widget cuando esté listo (retirando el
   código a medida de curve-landing) — o quedarse como está.
 
@@ -217,8 +239,10 @@ Wizard de 4 pasos + pantalla de estado:
 
 **Pantalla final**: enlace hosteado + snippet para copiar + botón "Probar mi
 checkout" + guía por plataforma (página propia / Shopify / Wix / link-in-bio).
-Para Shopify: instrucciones de reemplazar el botón de compra por el enlace, o
-pegar el widget en el tema (Custom Liquid).
+Para Shopify: pegar el script del widget en el tema (Custom Liquid /
+theme.liquid) y marcar el botón de compra existente con `data-sendura-sku` —
+el botón queda "inteligente": zonas con cobertura van a Sendura y el resto
+sigue al checkout normal de Shopify, sin duplicar botones ni romper nada.
 
 ---
 
