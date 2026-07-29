@@ -19,6 +19,18 @@ Sus clientes compran ahí y los pedidos caen a Sendura con guía, exactamente co
 hoy le pasa a CURVE. El dinero de Wompi llega **directo a la cuenta Wompi de cada
 tienda** (Sendura orquesta, no toca la plata).
 
+**Alcance de producto: CUALQUIER tipo de producto y dos modos de logística.**
+El checkout no está atado a un catálogo específico — cada tienda define sus
+propios productos (ropa, comida, tecnología, lo que sea, con foto, precio y
+cantidad). Y soporta los dos modos de operación de Sendura:
+
+- **Bodega (fulfillment)**: el producto está en inventario de Sendura (SKU
+  existente) — flujo actual de CURVE.
+- **Recogida (pickup)**: el producto está en el local de la tienda; al crear el
+  pedido, la logística asigna primero la **recogida en la dirección de la
+  tienda** y luego la entrega al cliente final. Para estos productos el SKU de
+  inventario Sendura no aplica (se usa una referencia propia de la tienda).
+
 ---
 
 ## 2. Arquitectura general
@@ -87,18 +99,29 @@ se pueda exponer sin riesgo:
 | `subscriptions_enabled` | bool |
 | `fallback_url` | URL a la que enviar clientes FUERA de cobertura (ej. su Shopify). Nullable → mensaje "aún no llegamos a tu zona" |
 | `success_message`, `whatsapp` | opcionales para la pantalla final |
+| `default_fulfillment` | `warehouse` \| `pickup` — modo por defecto de los productos |
+| `pickup_address_1`, `pickup_address_2` | dirección de recogida (requerida si usa pickup) |
+| `pickup_city`, `pickup_province` | deben estar dentro de la cobertura de Sendura |
+| `pickup_contact_name`, `pickup_contact_phone` | a quién contacta el mensajero al recoger |
 
-### `shop_checkout_products` (productos vendibles en el checkout)
+### `shop_checkout_products` (productos vendibles en el checkout — cualquier rubro)
 
 | Campo | Notas |
 |---|---|
-| `shop_id` + `key` | `key` corta para el widget (ej. `curve-60`) |
-| `sku` | debe existir en inventario Sendura |
-| `name`, `image_url` | |
+| `shop_id` + `key` | `key` corta para el widget (ej. `camiseta-negra-m`) |
+| `fulfillment` | `warehouse` \| `pickup` \| null (hereda `default_fulfillment`) |
+| `sku` | **warehouse**: debe existir en inventario Sendura. **pickup**: referencia libre de la tienda (o autogenerada `PKP-{shop}-{key}`) |
+| `name`, `image_url`, `description` | libres — sirve para cualquier tipo de producto |
 | `price` | COP — **autoritativo** |
 | `compare_at_price` | opcional (precio tachado) |
 | `max_qty` | default 5 |
 | `active` | bool |
+
+**Pedidos de productos `pickup`**: al crearse, la orden queda marcada
+`requires_pickup = true` y lleva la dirección de recogida de la tienda — el
+módulo de asignación/optimización de ruta debe programar **recogida → entrega**
+(o el flujo operativo que ya use Sendura para recogidas). La validación de SKU
+contra inventario se OMITE para estos ítems.
 
 ### `shop_checkout_plans` (planes de suscripción)
 
@@ -152,6 +175,8 @@ Igual al endpoint de suscripciones actual, pero resolviendo plan/precio de
 - **Página**: `GET /checkout/{public_token}` (+ `?sku=` para preseleccionar y
   `?plan=` para abrir en modo suscripción). Mobile-first, con el branding de la
   tienda. Flujo idéntico al validado en CURVE:
+  0. Sin `?sku`: **catálogo** — grilla con todos los productos activos de la
+     tienda (foto, nombre, precio) para elegir. Con `?sku`: va directo al paso 1.
   1. Producto/plan + cantidad
   2. Departamento → ciudad (cobertura Sendura)
      - Con cobertura → formulario (contra entrega / pagar ahora / suscripción)
@@ -180,7 +205,11 @@ Wizard de 4 pasos + pantalla de estado:
    "copiar URL de eventos" (`https://sendura.edgasanc.com/api/webhooks/wompi`)
    con instrucción de pegarla en su panel de Wompi. **Validar las llaves al
    guardar** (llamada de prueba a Wompi) y mostrar ✔/✖.
-2. **Productos**: elegir SKUs de su inventario, precio, imagen, cantidad máx.
+2. **Logística y productos**: primero "¿Dónde están tus productos?" —
+   **En bodega Sendura** (elige SKUs de su inventario) o **En mi local, Sendura
+   los recoge** (pide dirección de recogida + contacto, dentro de cobertura).
+   Luego agrega productos: nombre, foto, precio, cantidad máx. — cualquier tipo
+   de producto; se puede mezclar bodega y recogida por producto.
 3. **Planes** (opcional): producto + precio/ciclo + cada cuántos días +
    ¿termina solo? (max_cycles) — con texto claro: "ej. 2 = plan de 2 meses".
 4. **Personalización**: logo, color, URL de respaldo fuera de cobertura,
@@ -225,7 +254,7 @@ correcta:
 |---|---|---|
 | **1** | Modelo de datos + endpoints públicos + checkout hosteado (enlace directo) + panel básico | Cualquier tienda vende con un link |
 | **2** | widget.js embebible + branding + validador de llaves Wompi + guías por plataforma | Integración "pegar 2 líneas" |
-| **3** | (Futuro) App de Shopify oficial, métricas de conversión del checkout, Nequi tokenizado en suscripciones | Escala |
+| **3** | (Futuro) App de Shopify oficial, carrito multi-producto en un solo pedido, métricas de conversión del checkout, Nequi tokenizado en suscripciones | Escala |
 
 La fase 1 reutiliza casi todo lo que ya existe (orders, subscriptions,
 max_cycles, webhook) — el trabajo nuevo grande es el panel de configuración y
