@@ -208,6 +208,15 @@ mandar fuera-de-cobertura a una URL específica). Si está vacío, el default de
 widget es "continuar con el flujo original del botón". En el checkout hosteado
 por enlace directo (sin widget, ej. link de Instagram) no hay "flujo original",
 así que ahí aplica `fallback_url` o el mensaje amable.
+
+**Modo auto-Shopify del widget** (integración sin tocar botones): si el script
+lleva `data-shopify="auto"`, widget.js detecta los formularios de compra de
+Shopify (`form[action*="/cart/add"]`), intercepta el submit y lee el variant
+seleccionado. Para mapear el producto, `shop_checkout_products` gana el campo
+opcional `shopify_variant_id` (o se empareja por SKU si la tienda usa el mismo
+SKU en ambos lados). Producto no mapeado o sin cobertura → el submit continúa
+a Shopify normalmente. Así la instrucción para Shopify es UNA sola: pegar el
+script en el tema.
 - La tienda CURVE puede migrar a este widget cuando esté listo (retirando el
   código a medida de curve-landing) — o quedarse como está.
 
